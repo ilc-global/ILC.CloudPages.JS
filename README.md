@@ -4,15 +4,35 @@
 ## Development Plan
 
 ### Phase 1
-#### Primitives
+#### Primitive Parameters
 * Strings
-* Numbers - Integer, Percentage, Amount
-* Date
+  - Single Line
+  - Multi Line
+* Numbers 
+  - Integer
+  - Decimals
+    - Percentage
+    - Amount
+* Date/Time
+  - Date
+  - Timestamp
+  - Time
 * CheckBox
+  - Unselected Value
+  - Selected Value
+  - Null Value
 
 ### Phase 2
 #### Advanced Primitives
 * Date Ranges
+  - Relative Date Ranges
+    - Today, Yesterday, Tomorrow
+    - This Week, Last Week, Next Week
+    - This Month, Last Month, Next Month
+    - This Quarter, Last Quarter, Next Quarter
+    - This YTD, Last YTD, Next YTD
+    - This MTD, Last MTD, Next MTD
+* Number Ranges
 * ComboBoxes - Single Selects / Multi Select
 * CheckBoxes - Single Select / Multi Select
 
@@ -54,3 +74,4 @@ Record Parameters will allow a single value, all values (%), or multiple selecte
 * RMA
 
 Document Parameters will allow a single, all or multiple selected values.
+
