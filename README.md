@@ -6,7 +6,7 @@
 ### Phase 1
 #### Primitives
 * Strings
-* Numbers
+* Numbers - Integer, Percentage, Amount
 * Date
 * CheckBox
 
@@ -17,12 +17,14 @@
 * CheckBoxes - Single Select / Multi Select
 
 ### Phase 3
-##### Database Parameters
+#### Database Parameters
 * ComboBox - Single Select / Multi Select - With Values from Database
 * ComboBox With Auto Complete/Search
 * ComboBox with Lazy Auto Complete/Search
 
-##### Record Parameters
+### Phase 4
+
+#### Record Parameters
 * Part
 * Product
 * Customer
@@ -31,6 +33,17 @@
 * Kit
 * Location Group
 * Location
+* Account
+* Carrier
+* QBClass
+* User aka Sales Person
+* Product Tree
+* Payment Method
+
+Record Parameters will allow a single value, all values (%), or multiple selected values.
+
+### Phase 5
+#### Document Parameters
 * MO
 * WO
 * PO
@@ -39,6 +52,5 @@
 * Ship
 * Pick
 * RMA
-* QBClass
-* Sales Person
-* Product Tree
+
+Document Parameters will allow a single, all or multiple selected values.
