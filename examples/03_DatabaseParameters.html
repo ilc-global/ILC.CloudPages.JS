@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Parameters</title>
+</head>
+<body>
+    <div id="parameters"></div>
+</body>
+<script id="parameters" type="application/json">
+{
+    "combo_01" : {
+        "label" : "Combo Box",
+        "type" : "combobox",
+        "mode" : "single",
+        "sql" : "select id,name,description from inventorylogtype",
+        "value" : "id",
+        "display" : "name,description"
+    },
+    "combo_02" : {
+        "label" : "Combo Box",
+        "type" : "combobox",
+        "mode" : "multi",
+        "sql" : "select id,name,description from inventorylogtype",
+        "value" : "id",
+        "display" : "name,description"
+    },
+    "combo_03" : {
+        "label" : "Combo Box Auto Complete",
+        "type" : "combobox",
+        "mode" : "multi",
+        "sql" : "select id,name,description from inventorylogtype",
+        "value" : "id",
+        "display" : "name,description",
+        "search" : "description"
+    },    
+    "combo_04" : {
+        "label" : "Combo Box Auto Complete Lazy",
+        "type" : "combobox",
+        "mode" : "multi",
+        "sql" : "select id,name,description from inventorylogtype where name like @input",
+        "value" : "id",
+        "display" : "name,description",
+        "lazy" : true,
+    },        
+    "check_01" : {
+        "label" : "Combo Box",
+        "type" : "checkbox",
+        "mode" : "single",
+        "sql" : "select id,name,description from inventorylogtype",
+        "value" : "id",
+        "display" : "name,description"
+    },
+    "check_02" : {
+        "label" : "Combo Box",
+        "type" : "checkbox",
+        "mode" : "multi",
+        "sql" : "select id,name,description from inventorylogtype",
+        "value" : "id",
+        "display" : "name,description"
+    },
+}
+</script>
+</html>

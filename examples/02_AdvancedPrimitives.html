@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Primitives</title>
+</head>
+<body>
+    <div id="parameters"></div>
+</body>
+<script id="parameters" type="application/json">
+{
+    "datetime_01" : {
+        "label" : "Date and Time Range",
+        "type" : "timestamp",
+        "mode" : "range"
+    },
+    "datetime_02" : {
+        "label" : "Date Range",
+        "type" : "date",
+        "mode" : "range"
+    },    
+    "datetime_03" : {
+        "label" : "Time Range",
+        "type" : "time",
+        "mode" : "range"
+    },
+    "datetime_04" : {
+        "label" : "Date and Time Range",
+        "type" : "timestamp",
+        "mode" : "range",
+        "default_range" : "this_week"
+    },        
+    "datetime_04" : {
+        "label" : "Date and Time Range",
+        "type" : "timestamp",
+        "mode" : "range",
+        "default_range" : "last_mtd"
+    },    
+    "datetime_04" : {
+        "label" : "Date and Time Range",
+        "type" : "timestamp",
+        "mode" : "range",
+        "default_range" : "next_ytd"
+    },        
+    "number_01" : {
+        "label" : "Number Range",
+        "type" : "int",
+        "mode" : "range",
+    }
+    "number_02" : {
+        "label" : "Percent Range",
+        "type" : "pct",
+        "mode" : "range",
+    },
+    "number_03" : {
+        "label" : "Amount Range",
+        "type" : "amt",
+        "mode" : "range",
+    },
+    "combo_01" : {
+        "label" : "Combo Box",
+        "type" : "combobox",
+        "mode" : "single",
+        "data" : [
+            {
+                "id" : 1,
+                "name" : "Option 1"
+            },
+            {
+                "id" : 2,
+                "name" : "Option 2"
+            },
+        ]
+        "value" : "id",
+        "display" : "name"
+    },
+    "combo_02" : {
+        "label" : "Combo Box",
+        "type" : "combobox",
+        "mode" : "multi",
+        "data" : [
+            {
+                "id" : 1,
+                "name" : "Option 1"
+            },
+            {
+                "id" : 2,
+                "name" : "Option 2"
+            },
+        ]
+        "value" : "id",
+        "display" : "name"
+    },
+    "check_01" : {
+        "label" : "CheckBox",
+        "type" : "checkbox",
+        "mode" : "single",
+        "data" : [
+            {
+                "id" : 1,
+                "name" : "Option 1"
+            },
+            {
+                "id" : 2,
+                "name" : "Option 2"
+            },
+        ]
+        "value" : "id",
+        "display" : "name"
+    },
+    "check_02" : {
+        "label" : "CheckBox",
+        "type" : "checkbox",
+        "mode" : "multi",
+        "data" : [
+            {
+                "id" : 1,
+                "name" : "Option 1"
+            },
+            {
+                "id" : 2,
+                "name" : "Option 2"
+            },
+        ]
+        "value" : "id",
+        "display" : "name"
+    }
+}
+</script>
+</html>

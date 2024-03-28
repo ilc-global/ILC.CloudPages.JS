@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_path" content="TBD:PATH">
+    <meta name="fb_modules" content="MODULES">
+    <meta name="fb_title" content="TITLE">    
+    <meta name="fb_description" content="DESC">
+    <meta name="window_state" content="maximized">
+    <title>Document</title>    
+    <!-- ILC Page JS Merged Minified -->
+    <!-- ILC Page CSS Merged -->
+</head>
+<body>
+    <div id="title"></div>
+    <div id="parameters"></div>
+    <div id="results"></div>
+    <div id="footer"></div>
+</body>
+<script id="settings" type="application/json">
+{
+    "enable_xlsx_export" : true,
+    "enable_csv_export" : true,
+}
+</script>
+<script id="query" type="text/plain">
+SELECT
+
+so.id as so_id,
+so.num AS so_num,
+so.note AS so_note,
+so.totalTax AS so_total_tax,
+so.dateIssued AS so_date_issued,
+so.dateissued AS so_date_issued_date,
+so.dateissued AS so_date_issued_time,
+so.taxRate AS so_tax_rate,
+so.taxRate AS so_tax_rate_pct,
+so.billToZip AS so_billto_zip,
+soitem.id AS soitem_id,
+soitem.productNum AS product_num,
+soitem.description AS product_desc,
+soitem.unitPrice AS line_price_amt,
+soitem.unitPrice AS line_price_total,
+soitem.qtyFulfilled AS qty_to_fulfill,
+soitem.qtyFulfilled AS qty_to_fulfill_qty
+
+FROM so
+    JOIN soitem ON soitem.soid = so.id
+    
+LIMIT 100		
+</script>
+<script id="parameters" type="application/json">
+</script>
+<script id="columns" type="application/json">
+{
+    "so_num" : {
+        "label" : "SO#",
+        "hyperlink" : "so",
+        "href" : "so_id"
+    },
+    "so_total_tax" : {
+        "type" : "currency"
+    },    
+    "so_date_issued" : {
+        "type" : "date",        
+    }
+}
+</script>
+<script>
+$(document).ready(function(){
+    prepare_report();
+})
+</script>
+</html>
