@@ -5,168 +5,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="fb_path" content="TBD:PATH">
     <meta name="fb_modules" content="MODULES">
-    <meta name="fb_title" content="01_Example Test">    
+    <meta name="fb_title" content="01_Example">    
     <meta name="fb_description" content="DESC">
     <meta name="window_state" content="maximized">
-    <title>Document</title>    
+    <title> 01_Example Test </title>    
     <!-- ILC Page JS Merged Minified -->
     <!-- ILC Page CSS Merged -->
+   <!-- <script src="prepare_report_script.js"></script> -->
 </head>
-<body> 
+<body>
     <div id="title"></div>
     <div id="parameters"></div>
     <div id="results"></div>
     <div id="footer"></div>
 </body>
-<body>
-    <div class="container-fluid">
-        <h1>Database Queries</h1>  
-        <p>This time from a file, and rendering it as a table using DataTables.</p>  
-        <div class="form-group">
-            <button class="btn btn-primary" id="execute">Execute</button>
-        </div>
-        <hr></hr>
-        <div class="form-group">
-            <label for="results">Results</label>
-            <div id="table_div">
-                <table id="results_table" class="display" width="100%"></table>
-            </div>
-        </div>
-    </div>    
-</body>
-<script>
-    $(document).ready(function(){
-        $("#execute").click(function (e){
-            var sql_query = fb_client.getResourceFileString("sql/03_Query.sql");
-            console.log(sql_query);
-            var results = fb_client.runQuery(sql_query);
-            var results_obj = JSON.parse(results);
-            console.log(results_obj);
-            
-            $("#results_table").DataTable({
-                data: results_obj,
-                columns: [
-                    {data:'so_num',title:"SO #"},
-                    {data:'so_totalprice',title:"Total Price", render: $.fn.dataTable.render.number(',','.',2,'$ ') },
-                    {data:'so_totaltax',title:"Total Tax",  render: $.fn.dataTable.render.number(',','.',2,'$ ') },
-                    {data:'customer_name',title:"Customer Name"},
-                ]
-            });
-        })
-    });
-</script>
 <script id="settings" type="application/json">
 {
-    "load_on_open" : false,
-    "database_timezone" : "UTC-8", 
-    "amount_unit_format" : "$0.00####",
-    "amount_total_format" : "$0.00",
-    "qty_unit_format" : "0.00###",
-    "qty_total_format" : "0",
-    "enable_xlsx_export" : true,
-    "enable_csv_export" : true,
+    "load_on_open": false,
+    "database_timezone": "UTC-8",
+    "amount_unit_format": "$0.00####",
+    "amount_total_format": "$0.00",
+    "qty_unit_format": "0.00###",
+    "qty_total_format": "0",
 }
 </script>
 <script id="query" type="text/plain">
-SELECT
-
-so.num AS so_num,
-so.totalTax AS so_total_tax,
-so.dateIssued AS so_date_issued,
-so.billToZip AS so_billto_zip,
-
-soitem.productNum AS product_num,
-soitem.qtyFulfilled AS qty_to_fulfill
-
-FROM so
-    JOIN soitem ON soitem.soid = so.id
-    
-WHERE so.customerId '{{customer}}'	
-AND DATE(so.dateIssued) '{{date_issued}}'
-    
-LIMIT 100	
+// Replace this section with query
 </script>
+
 <script id="parameters" type="application/json">
 {
-    "child_customers" : {
-        "type" : "multiselect",
-        "sql" : "select id,name from customer where customer.parentid = 100",
-        "value" : "id",
-        "display" : "name"
+    "child_customers": {
+        "type": "multiselect",
+        "sql": "select id,name from customer where customer.parentid = 100",
+        "value": "id",
+        "display": "name"
     },
-    "customer" : {
-        "type" : "customer",
-        "mode" : "single", // single, multi
-        "default" : "%", // default option
+    "customer": {
+        "type": "customer",
+        "mode": "single",
+        "default": "%"
     },
     "date_issued": {
         "label": "Date Issued",
-        "type" : "date",
-        "mode" : "range", // range, before, after
-        "valuetype" : "timestamp", // timestamp, date
-        "range_default" : "today", // today, this week, last week, all relative dates
+        "type": "date",
+        "mode": "range",
+        "valuetype": "timestamp",
+        "range_default": "today"
     }
 }
 </script>
 <script id="columns" type="application/json">
 {
-    "so_total_tax" : {
-        "format" : "currency"
-    },
-    "so_date_issued" : {
-        "format" : "date"
-    }
-}
-</script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
-<script> 
-$(document).ready(function(){
-    // Function to prepare and execute the report
-    function prepare_report() {
-        // Retrieve SQL query from script tag
-        var sql_query = $('#query').text();
-        
-        // Fetch values from input fields
-        var customer = $('#customer').val(); // Assuming you have an input field with id "customer"
-        var date_issued = $('#date_issued').val(); // Assuming you have an input field with id "date_issued"
-        
-        // Replace placeholders in the SQL query with actual values from input fields
-        sql_query = sql_query.replace('{{customer}}', customer);
-        sql_query = sql_query.replace('{{date_issued}}', date);
-        
-        // Execute the SQL query
-        var results = fb_client.runQuery(sql_query);
-        var results_obj = JSON.parse(results);
-        
-        // Parse the results into a format compatible with DataTables
-        var data = results_obj.map(function(item) {
-            return {
-                so_num: item.so_num,
-                so_total_tax: item.so_total_tax,
-                so_date_issued: item.so_date_issued,
-                so_billto_zip: item.so_billto_zip,
-                product_num: item.product_num,
-                qty_to_fulfill: item.qty_to_fulfill
-            };
-        });
-        
-        // Render the DataTable
-        $("#results").DataTable({
-            data: data,
-            columns: [
-                {data:'so_num', title: "SO #"},
-                {data:'so_total_tax', title: "Total Tax"},
-                {data:'so_date_issued', title: "Date Issued"},
-                {data:'so_billto_zip', title: "Bill To Zip"},
-                {data:'product_num', title: "Product Num"},
-                {data:'qty_to_fulfill', title: "Qty To Fulfill"}
-            ]
-        });
-    }
+    "so_num": { "format": "text" },
+    "so_date_issued": { "format": "date" },
+    "customer_name": { "format": "text" },
+    "line_type": { "format": "text" },
+    "line_number": { "format": "text" },
+    "product_num": { "format": "text" },
+    "product_description": { "format": "text" },
+    "shipped_qty": { "format": "number" },
+    "total_revenue": { "format": "currency" },
+    "line_unit_cost": { "format": "currency" },
+    "total_cogs": { "format": "currency" }
+};
 
-    // Call the prepare_report function when the document is ready
+</script>
+<script>
+$(document).ready(function(){
     prepare_report();
 });
 </script>
