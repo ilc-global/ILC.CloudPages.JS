@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="HTML_genFromParam.html">    
     <title>Parameter HTML Generation</title>
     <style>
         body {
@@ -36,21 +37,21 @@
     {
         "child_customers" : {
             "type" : "multiselect",
-            "sql" : "select id,name from customer where customer.parentid = 100"
+            "sql" : "select id,name from customer where customer.parentid = 100",
             "value" : "id",
-            "display" : "name"
+            "display" : "name",
         },
         "customer" : {
             "type" : "customer",
-            "mode" : "single", // single, multi
-            "default" : "%", // default option
+            "mode" : "single",
+            "default" : "%",
         },
         "date_issued": {
             "label": "Date Issued",
             "type" : "date",
-            "mode" : "range", // range, before, after
-            "valuetype" : "timestamp", // timestamp, date
-            "range_default" : "today", // today, this week, last week, all relative dates
+            "mode" : "range",
+            "valuetype" : "timestamp",
+            "range_default" : "today",
         }
     }
     </script>
@@ -91,7 +92,7 @@
         });
     }
 
-    // Function to handle form submission (unsure if needed)
+    // Function to handle form submission (unsure if needed) dont
     function submitForm() {
         var form = document.createElement('form');
         form.appendChild(document.createTextNode('Form submitted successfully!'));

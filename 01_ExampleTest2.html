@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="01_ExampleTest2">    
     <title>Table Generation Demo</title>
     <!-- Include jQuery and DataTables -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -30,10 +31,10 @@
 
     <script>
     $(document).ready(function() {
-        // Sample data 
+        // Sample data - fill in data 
         var resultsData = [
-            { so_num: '123', so_date_issued: '2024-05-15', customer_name: 'name1', line_type: 'Type A', line_number: '1', product_num: 'P001', product_description: 'Product A', shipped_qty: 100, total_revenue: 500.00, line_unit_cost: 200.00, total_cogs: 150.00 },
-            { so_num: '124', so_date_issued: '2024-05-16', customer_name: 'name2', line_type: 'Type B', line_number: '2', product_num: 'P002', product_description: 'Product B', shipped_qty: 150, total_revenue: 750.00, line_unit_cost: 300.00, total_cogs: 200.00 }
+            { so_num: '123', so_date_issued: '2024-05-1', customer_name: 'name1', line_type: 'Type A', line_number: '1', product_num: 'P001', product_description: 'Product A', shipped_qty: 100, total_revenue: 500.00, line_unit_cost: 200.00, total_cogs: 150.00 },
+            { so_num: '124', so_date_issued: '2024-05-2', customer_name: 'name2', line_type: 'Type B', line_number: '2', product_num: 'P002', product_description: 'Product B', shipped_qty: 150, total_revenue: 750.00, line_unit_cost: 300.00, total_cogs: 200.00 }
         ];
 
         // Retrieve columns configuration
@@ -43,21 +44,18 @@
         generateDataTable(resultsData, columnsConfig, '#results');
     });
 
-    // Function to generate a DataTable from JSON data and column settings
+   // Function to generate a DataTable from JSON data and column settings
     function generateDataTable(data, columnsConfig, targetElement) {
         return $(targetElement).DataTable({
             data: data,
-            columns: Object.keys(columnsConfig).map(function(column) {
-                return { data: column, title: column.replace(/_/g, ' ').toUpperCase() };
-            }),
-            columnDefs: Object.keys(columnsConfig).map(function(column) {
-                return {
-                    targets: column,
-                    render: function(data, type, row) {
-                        return renderColumnData(data, columnsConfig[column].format);
-                    }
-                };
-            })
+            columns: Object.keys(columnsConfig).map(column => ({
+                data: column,
+                title: column.replace(/_/g, ' ').toUpperCase()
+            })),
+            columnDefs: Object.keys(columnsConfig).map(column => ({
+                targets: column,
+                render: (data, type, row) => renderColumnData(data, columnsConfig[column].format)
+            }))
         });
     }
 
