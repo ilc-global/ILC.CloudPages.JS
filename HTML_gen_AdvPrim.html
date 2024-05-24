@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="HTML_gen_AdvPrim.html">    
+    <title>Advanced Primitives</title>
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 200px;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="parametersContainer"></div>
+
+    <script id="parameters" type="application/json">
+    {
+        "datetime_01": { "label": "Date and Time Range", "type": "timestamp", "mode": "range" },
+        "datetime_02": { "label": "Date Range", "type": "date", "mode": "range" },
+        "datetime_03": { "label": "Time Range", "type": "time", "mode": "range" },
+        "datetime_04": { "label": "Date and Time Range", "type": "timestamp", "mode": "range", "default_range": "this_week" },
+        "number_01": { "label": "Number Range", "type": "int", "mode": "range" },
+        "number_02": { "label": "Percent Range", "type": "pct", "mode": "range" },
+        "number_03": { "label": "Amount Range", "type": "amt", "mode": "range" },
+        "combo_01": {
+            "label": "Combo Box",
+            "type": "combobox",
+            "mode": "single",
+            "data": [
+                { "id": 1, "name": "Option 1" },
+                { "id": 2, "name": "Option 2" }
+            ],
+            "value": "id",
+            "display": "name"
+        },
+        "combo_02": {
+            "label": "Combo Box",
+            "type": "combobox",
+            "mode": "multi",
+            "data": [
+                { "id": 1, "name": "Option 1" },
+                { "id": 2, "name": "Option 2" }
+            ],
+            "value": "id",
+            "display": "name"
+        },
+        "check_01": {
+            "label": "CheckBox",
+            "type": "checkbox",
+            "mode": "single",
+            "data": [
+                { "id": 1, "name": "Option 1" },
+                { "id": 2, "name": "Option 2" }
+            ],
+            "value": "id",
+            "display": "name"
+        },
+        "check_02": {
+            "label": "CheckBox",
+            "type": "checkbox",
+            "mode": "multi",
+            "data": [
+                { "id": 1, "name": "Option 1" },
+                { "id": 2, "name": "Option 2" }
+            ],
+            "value": "id",
+            "display": "name"
+        }
+    }
+    </script>
+
+    <script>
+    function generateParameterForm() {
+        const parameters = JSON.parse(document.getElementById('parameters').textContent);
+        const container = document.getElementById('parametersContainer');
+
+        Object.entries(parameters).forEach(([key, { label, type, default: def }]) => {
+            const inputElement = document.createElement(type === 'multiline' ? 'textarea' : 'input');
+            inputElement.type = (type === 'multiline') ? '' : (type === 'int' || type === 'pct' || type === 'amt') ? 'text' : type;
+            inputElement.className = 'form-control';
+            inputElement.id = key;
+            inputElement.placeholder = label;
+            if (type === 'checkbox') inputElement.checked = def || false;
+
+            const labelElement = document.createElement('label');
+            labelElement.htmlFor = key;
+            labelElement.textContent = label;
+
+            container.appendChild(labelElement);
+            container.appendChild(inputElement);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', generateParameterForm);
+    </script>
+</body>
+</html>
