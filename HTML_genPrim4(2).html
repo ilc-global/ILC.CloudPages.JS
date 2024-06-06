@@ -43,6 +43,7 @@
 </head>
 <body>
     <div id="parametersContainer"></div>
+    <button id="submitButton" class="btn btn-primary">Submit</button>
 
     <script id="parameters" type="application/json">
     {
@@ -128,6 +129,15 @@
                 const parameter = parameters[key];
                 const formGroup = createFormGroup(key, parameter);
                 container.appendChild(formGroup);
+
+                const inputElement = document.getElementById(key);
+                const errorElement = document.getElementById(key + '_error');
+
+                if (inputElement) {
+                    inputElement.addEventListener('input', function() {
+                        validateInput(parameter, inputElement, errorElement);
+                    });
+                }
             });
         }
 
@@ -162,6 +172,20 @@
             }
         }
 
+        function validateInput(parameter, inputElement, errorElement) {
+            switch (parameter.type) {
+                case 'int':
+                    return validateInt(inputElement, errorElement);
+                case 'pct':
+                    return validatePct(inputElement, errorElement);
+                case 'amt':
+                    return validateAmt(inputElement, errorElement);
+                default:
+                    errorElement.textContent = '';
+                    return true;
+            }
+        }
+
         function validateForm() {
             const parameters = JSON.parse(document.getElementById('parameters').textContent);
             let valid = true;
@@ -172,24 +196,21 @@
                 const errorElement = document.getElementById(key + '_error');
 
                 if (inputElement) {
-                    switch (parameter.type) {
-                        case 'int':
-                            if (!validateInt(inputElement, errorElement)) valid = false;
-                            break;
-                        case 'pct':
-                            if (!validatePct(inputElement, errorElement)) valid = false;
-                            break;
-                        case 'amt':
-                            if (!validateAmt(inputElement, errorElement)) valid = false;
-                            break;
-                        default:
-                            errorElement.textContent = '';
-                    }
+                    if (!validateInput(parameter, inputElement, errorElement)) valid = false;
                 }
             });
 
             return valid;
         }
+
+        // Handle form submission
+        document.getElementById('submitButton').addEventListener('click', function() {
+            if (validateForm()) {
+                alert('Form submitted successfully!');
+            } else {
+                alert('Please correct the errors in the form.');
+            }
+        });
 
         // Generate form elements on page load
         document.addEventListener('DOMContentLoaded', function() {
