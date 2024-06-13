@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="HTML Generation Primitives 4 pt.5">
+    <title>Parameter HTML Generation</title>
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 200px;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+        .form-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            width: 150px;
+            margin-right: 10px;
+        }
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-left: 131px;
+        }
+        .error {
+            color: red;
+            margin-left: 10px;
+        }
+        .required-asterisk {
+            color: red;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="parametersContainer"></div>
+    <button id="submitButton" class="btn btn-primary">Run</button>
+    <script id="query" type="text/plain">
+        SELECT
+        
+        so.num AS so_num,
+        so.totalTax AS so_total_tax,
+        so.dateIssued AS so_date_issued,
+        so.billToZip AS so_billto_zip,
+        
+        soitem.productNum AS product_num,
+        soitem.qtyFulfilled AS qty_to_fulfill
+        
+        FROM so
+            JOIN soitem ON soitem.soid = so.id
+            
+        WHERE DATE(so.dateIssued) BETWEEN :date_issued_start and :date_issued_end
+        
+        </script>
+    <script id="parameters" type="application/json">
+        {
+            "date_issued_start": {
+                "label" : "Start",
+                "type" : "date"
+            },
+            "date_issued_end": {
+                "label" : "End",
+                "type" : "date"
+            }    
+        }
+    </script>
+
+    <script>
+        // Function to create form group with label, input, and error elements
+        function createFormGroup(key, parameter) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+
+            const labelElement = document.createElement('label');
+            labelElement.setAttribute('for', key);
+            labelElement.textContent = parameter.label;
+            if (parameter.required === undefined) {
+                parameter.required = false; // Set default value to false if not specified
+            }
+            if (parameter.required) {
+                const asterisk = document.createElement('span');
+                asterisk.textContent = '*';
+                asterisk.className = 'required-asterisk';
+                labelElement.appendChild(asterisk);
+            }
+            formGroup.appendChild(labelElement);
+
+            let inputElement;
+            switch (parameter.type) {
+                case 'text':
+                case 'int':
+                case 'pct':
+                case 'amt':
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'text');
+                    inputElement.className = 'form-control';
+                    break;
+                case 'multiline':
+                    inputElement = document.createElement('textarea');
+                    inputElement.className = 'form-control';
+                    break;
+                case 'datetime-local':
+                case 'date':
+                case 'time':
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', parameter.type);
+                    inputElement.className = 'form-control';
+                    break;
+                case 'checkbox':
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'checkbox');
+                    inputElement.className = 'form-check-input';
+                    formGroup.insertBefore(inputElement, labelElement); // Insert checkbox before the label
+                    break;
+                default:
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'text');
+                    inputElement.className = 'form-control';
+            }
+
+            inputElement.setAttribute('id', key);
+            inputElement.setAttribute('placeholder', parameter.label);
+            formGroup.appendChild(inputElement);
+
+            const errorElement = document.createElement('span');
+            errorElement.className = 'error';
+            errorElement.setAttribute('id', key + '_error');
+            formGroup.appendChild(errorElement);
+
+            return formGroup;
+        }
+
+        // Function to generate HTML form elements based on parameter JSON
+        function generateParameterForm() {
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+            const container = document.getElementById('parametersContainer');
+
+            Object.keys(parameters).forEach(function(key) {
+                const parameter = parameters[key];
+                const formGroup = createFormGroup(key, parameter);
+                container.appendChild(formGroup);
+
+                const inputElement = document.getElementById(key);
+                const errorElement = document.getElementById(key + '_error');
+
+                if (inputElement) {
+                    inputElement.addEventListener('input', function() {
+                        validateInput(parameter, inputElement, errorElement);
+                    });
+                }
+            });
+        }
+
+        // Validation functions
+        function validateInt(inputElement, errorElement) {
+            if (!/^\d+$/.test(inputElement.value)) {
+                errorElement.textContent = 'Invalid whole number';
+                return false;
+            } else {
+                errorElement.textContent = '';
+                return true;
+            }
+        }
+
+        function validatePct(inputElement, errorElement) {
+            if (!/^\d+(\.\d+)?%?$/.test(inputElement.value)) {
+                errorElement.textContent = 'Invalid percentage (e.g., 50 or 50.5%)';
+                return false;
+            } else {
+                errorElement.textContent = '';
+                return true;
+            }
+        }
+
+        function validateAmt(inputElement, errorElement) {
+            if (!/^\d+(\.\d{1,2})?$/.test(inputElement.value)) {
+                errorElement.textContent = 'Invalid amount (e.g., 100.00)';
+                return false;
+            } else {
+                errorElement.textContent = '';
+                return true;
+            }
+        }
+
+        function validateRequired(inputElement, errorElement, required) {
+            if (required && inputElement.value.trim() === '') {
+                errorElement.textContent = 'This field is required';
+                return false;
+            } else {
+                errorElement.textContent = '';
+                return true;
+            }
+        }
+
+        function validateInput(parameter, inputElement, errorElement) {
+            let isValid = true;
+
+            const required = parameter.required === undefined ? false : parameter.required;
+
+            if (!validateRequired(inputElement, errorElement, required
+            )) {
+                isValid = false;
+            }
+
+            switch (parameter.type) {
+                case 'int':
+                    if (!validateInt(inputElement, errorElement)) isValid = false;
+                    break;
+                case 'pct':
+                    if (!validatePct(inputElement, errorElement)) isValid = false;
+                    break;
+                case 'amt':
+                    if (!validateAmt(inputElement, errorElement)) isValid = false;
+                    break;
+                default:
+                    errorElement.textContent = '';
+            }
+
+            return isValid;
+        }
+
+        function validateForm() {
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+            let valid = true;
+
+            Object.keys(parameters).forEach(function(key) {
+                const parameter = parameters[key];
+                const inputElement = document.getElementById(key);
+                const errorElement = document.getElementById(key + '_error');
+
+                if (inputElement) {
+                    if (!validateInput(parameter, inputElement, errorElement)) valid = false;
+                }
+            });
+
+            return valid;
+        }
+
+        // Function to get form values and create JSON object
+        function getFormValues() {
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+            const formData = {};
+
+            Object.keys(parameters).forEach(function(key) {
+                const inputElement = document.getElementById(key);
+                if (inputElement) {
+                    if (inputElement.type === 'checkbox') {
+                        formData[key] = inputElement.checked ? parameters[key].true_value : parameters[key].false_value;
+                    } else {
+                        formData[key] = inputElement.value;
+                    }
+                }
+            });
+
+            return formData;
+        }
+
+        // Handle form submission
+        document.getElementById('submitButton').addEventListener('click', function() {
+            if (validateForm()) {
+                const formData = getFormValues();
+                console.log('Form Data JSON:', JSON.stringify(formData));
+                alert('Form submitted successfully!');
+                // Here you can add code to submit the JSON object to your server
+            } else {
+                alert('Please correct the errors in the form.');
+            }
+        });
+
+        // Generate form elements on page load
+        window.onload = generateParameterForm;
+    </script>
+</body>
+</html>

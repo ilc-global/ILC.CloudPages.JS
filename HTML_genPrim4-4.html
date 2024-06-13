@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="HTML Generation Primitives 4 pt.3">
+    <title>Parameter HTML Generation</title>
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 200px;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+        .form-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            width: 150px;
+            margin-right: 10px;
+        }
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-left: 131px;
+        }
+        .error {
+            color: red;
+            margin-left: 10px;
+        }
+        .required-asterisk {
+            color: red;
+            margin-left: 5px;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        #results table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #results table, #results th, #results td {
+            border: 1px solid black;
+        }
+        #results th, #results td {
+            padding: 10px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div id="parametersContainer"></div>
+    <button id="submitButton" class="btn btn-primary">Run</button>
+
+    <div id="results"></div>
+
+    <script id="query" type="text/plain">
+    SELECT
+    so.num AS so_num,
+    so.totalTax AS so_total_tax,
+    so.dateIssued AS so_date_issued,
+    so.billToZip AS so_billto_zip,
+    soitem.productNum AS product_num,
+    soitem.qtyFulfilled AS qty_to_fulfill
+    FROM so
+        JOIN soitem ON soitem.soid = so.id
+    WHERE DATE(so.dateIssued) BETWEEN :date_issued_start and :date_issued_end
+    </script>
+
+    <script id="parameters" type="application/json">
+    {
+        "date_issued_start": { "label": "Start Date", "type": "date", "required": true },
+        "date_issued_end": { "label": "End Date", "type": "date", "required": true }
+    }
+    </script>
+
+    <script>
+        // Function to create form group with label, input, and error elements
+        function createFormGroup(key, parameter) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+
+            const labelElement = document.createElement('label');
+            labelElement.setAttribute('for', key);
+            labelElement.textContent = parameter.label;
+            if (parameter.required === undefined) {
+                parameter.required = false; // Set default value to false if not specified
+            }
+            if (parameter.required) {
+                const asterisk = document.createElement('span');
+                asterisk.textContent = '*';
+                asterisk.className = 'required-asterisk';
+                labelElement.appendChild(asterisk);
+            }
+            formGroup.appendChild(labelElement);
+
+            let inputElement;
+            switch (parameter.type) {
+                case 'text':
+                case 'int':
+                case 'pct':
+                case 'amt':
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'text');
+                    inputElement.className = 'form-control';
+                    break;
+                case 'multiline':
+                    inputElement = document.createElement('textarea');
+                    inputElement.className = 'form-control';
+                    break;
+                case 'datetime-local':
+                case 'date':
+                case 'time':
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', parameter.type);
+                    inputElement.className = 'form-control';
+                    break;
+                case 'checkbox':
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'checkbox');
+                    inputElement.className = 'form-check-input';
+                    formGroup.insertBefore(inputElement, labelElement); // Insert checkbox before the label
+                    break;
+                default:
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'text');
+                    inputElement.className = 'form-control';
+            }
+
+            inputElement.setAttribute('id', key);
+            inputElement.setAttribute('placeholder', parameter.label);
+            formGroup.appendChild(inputElement);
+
+            const errorElement = document.createElement('span');
+            errorElement.className = 'error';
+            errorElement.setAttribute('id', key + '_error');
+            formGroup.appendChild(errorElement);
+
+            return formGroup;
+        }
+
+        // Function to generate HTML form elements based on parameter JSON
+        function generateParameterForm() {
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+            const container = document.getElementById('parametersContainer');
+
+            Object.keys(parameters).forEach(function(key) {
+                const parameter = parameters[key];
+                const formGroup = createFormGroup(key, parameter);
+                container.appendChild(formGroup);
+
+                const inputElement = document.getElementById(key);
+                const errorElement = document.getElementById(key + '_error');
+
+                if (inputElement) {
+                    inputElement.addEventListener('input', function() {
+                        validateInput(parameter, inputElement, errorElement);
+                    });
+                }
+            });
+        }
+
+        // Validation functions
+        function validateRequired(inputElement, errorElement, required) {
+            if (required && inputElement.value.trim() === '') {
+                errorElement.textContent = 'This field is required';
+                return false;
+            } else {
+                errorElement.textContent = '';
+                return true;
+            }
+        }
+
+        function validateInput(parameter, inputElement, errorElement) {
+            let isValid = true;
+
+            const required = parameter.required === undefined ? false : parameter.required;
+
+            if (!validateRequired(inputElement, errorElement, required)) {
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        function validateForm() {
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+            let valid = true;
+
+            Object.keys(parameters).forEach(function(key) {
+                const parameter = parameters[key];
+                const inputElement = document.getElementById(key);
+                const errorElement = document.getElementById(key + '_error');
+
+                if (inputElement) {
+                    if (!validateInput(parameter, inputElement, errorElement)) valid = false;
+                }
+            });
+
+            return valid;
+        }
+
+        // Function to get form values and create JSON object
+        function getFormValues() {
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+            const formData = {};
+
+            Object.keys(parameters).forEach(function(key) {
+                const inputElement = document.getElementById(key);
+                if (inputElement) {
+                    if (inputElement.type === 'checkbox') {
+                        formData[key] = inputElement.checked ? parameters[key].true_value : parameters[key].false_value;
+                    } else {
+                        formData[key] = inputElement.value;
+                    }
+                }
+            });
+
+            return formData;
+        }
+
+        // Function to render query results in a table
+        function renderResults(results) {
+            const resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = ''; // Clear previous results
+
+            if (!results || results.length === 0) {
+                resultsContainer.textContent = 'No results found.';
+                return;
+            }
+
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+            const headers = Object.keys(results[0]);
+
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            results.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = row[header];
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            resultsContainer.appendChild(table);
+        }
+
+        // Function to execute the query
+        function executeQuery() {
+            const query = document.getElementById('query').textContent.trim();
+            const formData = getFormValues();
+            const params = JSON.stringify(formData);
+
+            try {
+                // Simulating the execution of the query with mock data for demonstration purposes
+                const mockResults = [
+                    {
+                        so_num: 'SO123',
+                        so_total_tax: '100.50',
+                        so_date_issued: '2023-01-01',
+                        so_billto_zip: '12345',
+                        product_num: 'P001',
+                        qty_to_fulfill: '10'
+                    },
+                    {
+                        so_num: 'SO124',
+                        so_total_tax: '200.75',
+                        so_date_issued: '2023-01-02',
+                        so_billto_zip: '12346',
+                        product_num: 'P002',
+                        qty_to_fulfill: '20'
+                    }
+                ];
+                console.log('Mock results:', mockResults);
+
+                // In actual implementation, you would use:
+                // const results = fb_client.runQueryParameters(query, params);
+
+                const results = mockResults; // Use mock results for demonstration
+                if (!Array.isArray(results)) {
+                    throw new Error('Query results are not an array');
+                }
+                renderResults(results);
+                alert('Query executed successfully!');
+            } catch (error) {
+                console.error('Error executing query:', error);
+                alert('Error executing query.');
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('submitButton').addEventListener('click', function() {
+            if (validateForm()) {
+                executeQuery();
+            } else {
+                alert('Please correct the errors in the form.');
+            }
+        });
+
+        // Generate form elements on page load
+        window.onload = generateParameterForm;
+    </script>
+</body>
+</html>

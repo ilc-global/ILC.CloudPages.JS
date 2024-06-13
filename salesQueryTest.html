@@ -32,7 +32,7 @@
 <script>
     $(document).ready(function(){
         $("#execute").click(function (e){
-            var sql_query = fb_client.getResourceFileString("sales_query.sql");
+            var sql_query = fb_client.getResourceFileString("testSQL.sql");
             console.log(sql_query);
             var results = fb_client.runQuery(sql_query);
             var results_obj = JSON.parse(results);
