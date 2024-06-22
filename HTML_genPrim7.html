@@ -42,12 +42,30 @@
             color: red;
             margin-left: 5px;
         }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .checkbox-container label {
+            margin-bottom: 0;
+            width: auto;
+            margin-right: 10px;
+        }
+        .checkbox-container input[type="checkbox"] {
+            margin-left: 10px;
+        }
+        #submitMessage {
+            color: green;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div id="parametersContainer"></div>
     <button id="submitButton" class="btn btn-primary">Run</button>
-    <div id="results"></div>
+    <div id="submitMessage"></div>
 
     <script id="parameters" type="application/json">
     {
@@ -129,104 +147,102 @@
     </script>
 
     <script>
-    function createFormGroup(key, parameter) {
-    const formGroup = document.createElement('div');
-    formGroup.className = 'form-group';
+        function createFormGroup(key, parameter) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
 
-    const labelElement = document.createElement('label');
-    labelElement.setAttribute('for', key);
-    labelElement.textContent = parameter.label;
-    if (parameter.required === undefined) {
-        parameter.required = false; // Set default value to false if not specified
-    }
-    if (parameter.required) {
-        const asterisk = document.createElement('span');
-        asterisk.textContent = '*';
-        asterisk.className = 'required-asterisk';
-        labelElement.appendChild(asterisk);
-    }
-    formGroup.appendChild(labelElement);
-
-    let inputElement;
-    switch (parameter.type) {
-        case 'date':
-            if (parameter.mode === 'range') {
-                formGroup.appendChild(createRangeDateInput(key));
-            } else {
-                inputElement = document.createElement('input');
-                inputElement.setAttribute('type', 'date');
-                inputElement.className = 'form-control';
-                inputElement.setAttribute('id', key);
-                formGroup.appendChild(inputElement);
+            // Create and append label element
+            const labelElement = document.createElement('label');
+            labelElement.textContent = parameter.label;
+            if (parameter.required) {
+                const asterisk = document.createElement('span');
+                asterisk.textContent = '*';
+                asterisk.className = 'required-asterisk';
+                labelElement.appendChild(asterisk);
             }
-            break;
-        case 'time':
-            if (parameter.mode === 'range') {
-                formGroup.appendChild(createRangeTimeInput(key));
-            } else {
-                inputElement = document.createElement('input');
-                inputElement.setAttribute('type', 'time');
-                inputElement.className = 'form-control';
-                inputElement.setAttribute('id', key);
-                formGroup.appendChild(inputElement);
+            formGroup.appendChild(labelElement);
+
+            // Create input/select/textarea element based on parameter type
+            let inputElement;
+            switch (parameter.type) {
+                case 'date':
+                    if (parameter.mode === 'range') {
+                        formGroup.appendChild(createRangeDateInput(key));
+                    } else {
+                        inputElement = document.createElement('input');
+                        inputElement.setAttribute('type', 'date');
+                        inputElement.className = 'form-control';
+                        inputElement.setAttribute('id', key); // Set id for input element
+                        formGroup.appendChild(inputElement);
+                    }
+                    break;
+                case 'time':
+                    if (parameter.mode === 'range') {
+                        formGroup.appendChild(createRangeTimeInput(key));
+                    } else {
+                        inputElement = document.createElement('input');
+                        inputElement.setAttribute('type', 'time');
+                        inputElement.className = 'form-control';
+                        inputElement.setAttribute('id', key); // Set id for input element
+                        formGroup.appendChild(inputElement);
+                    }
+                    break;
+                case 'timestamp':
+                    if (parameter.mode === 'range') {
+                        formGroup.appendChild(createRangeTimestampInput(key));
+                    } else {
+                        inputElement = document.createElement('input');
+                        inputElement.setAttribute('type', 'datetime-local');
+                        inputElement.className = 'form-control';
+                        inputElement.setAttribute('id', key); // Set id for input element
+                        formGroup.appendChild(inputElement);
+                    }
+                    break;
+                case 'int':
+                case 'pct':
+                case 'amt':
+                    if (parameter.mode === 'range') {
+                        formGroup.appendChild(createRangeInput(key, parameter));
+                    } else {
+                        inputElement = document.createElement('input');
+                        inputElement.setAttribute('type', 'text');
+                        inputElement.className = 'form-control';
+                        inputElement.setAttribute('id', key); // Set id for input element
+                        formGroup.appendChild(inputElement);
+                    }
+                    break;
+                case 'combobox':
+                    inputElement = createComboBox(key, parameter);
+                    inputElement.setAttribute('id', key); // Set id for select element
+                    formGroup.appendChild(inputElement);
+                    break;
+                case 'checkbox':
+                    inputElement = createCheckBox(key, parameter);
+                    formGroup.appendChild(inputElement);
+                    break;
+                default:
+                    inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'text');
+                    inputElement.className = 'form-control';
+                    inputElement.setAttribute('id', key); // Set id for input element
+                    formGroup.appendChild(inputElement);
             }
-            break;
-        case 'timestamp':
-            if (parameter.mode === 'range') {
-                formGroup.appendChild(createRangeTimestampInput(key));
-            } else {
-                inputElement = document.createElement('input');
-                inputElement.setAttribute('type', 'datetime-local');
-                inputElement.className = 'form-control';
-                inputElement.setAttribute('id', key);
-                formGroup.appendChild(inputElement);
-            }
-            break;
-        case 'int':
-        case 'pct':
-        case 'amt':
-            if (parameter.mode === 'range') {
-                formGroup.appendChild(createRangeInput(key, parameter));
-            } else {
-                inputElement = document.createElement('input');
-                inputElement.setAttribute('type', 'text');
-                inputElement.className = 'form-control';
-                inputElement.setAttribute('id', key);
-                formGroup.appendChild(inputElement);
-            }
-            break;
-        case 'combobox':
-            inputElement = createComboBox(key, parameter);
-            formGroup.appendChild(inputElement);
-            break;
-        case 'checkbox':
-            inputElement = createCheckBox(key, parameter);
-            formGroup.appendChild(inputElement);
-            break;
-        default:
-            inputElement = document.createElement('input');
-            inputElement.setAttribute('type', 'text');
-            inputElement.className = 'form-control';
-            inputElement.setAttribute('id', key);
-            formGroup.appendChild(inputElement);
-    }
 
-    const errorElement = document.createElement('span');
-    errorElement.className = 'error';
-    errorElement.setAttribute('id', key + '_error');
-    formGroup.appendChild(errorElement);
+            // Create and append error message span
+            const errorElement = document.createElement('span');
+            errorElement.className = 'error';
+            errorElement.setAttribute('id', key + '_error');
+            formGroup.appendChild(errorElement);
 
-    return formGroup;
-}
+            return formGroup;
+        }
 
-
-        // Function to create range input for date, time, timestamp, int, pct, amt
         function createRangeInput(key, parameter) {
             const formGroup = document.createElement('div');
             formGroup.className = 'form-group';
 
             const startInput = document.createElement('input');
-            startInput.setAttribute('type', parameter.type);
+            startInput.setAttribute('type', 'text');
             startInput.className = 'form-control';
             startInput.setAttribute('id', key + '_start');
             formGroup.appendChild(startInput);
@@ -237,7 +253,7 @@
             formGroup.appendChild(toLabel);
 
             const endInput = document.createElement('input');
-            endInput.setAttribute('type', parameter.type);
+            endInput.setAttribute('type', 'text');
             endInput.className = 'form-control';
             endInput.setAttribute('id', key + '_end');
             formGroup.appendChild(endInput);
@@ -250,7 +266,7 @@
             return formGroup;
         }
 
-        function createRangeTimestampInput(key, parameter) {
+        function createRangeTimestampInput(key) {
             const formGroup = document.createElement('div');
             formGroup.className = 'form-group';
 
@@ -276,74 +292,78 @@
             errorElement.setAttribute('id', key + '_error');
             formGroup.appendChild(errorElement);
 
-        return formGroup;
-}
-function createRangeDateInput(key) {
-    const formGroup = document.createElement('div');
-    formGroup.className = 'form-group';
+            return formGroup;
+        }
 
-    const startInput = document.createElement('input');
-    startInput.setAttribute('type', 'date');
-    startInput.className = 'form-control';
-    startInput.setAttribute('id', key + '_start');
-    formGroup.appendChild(startInput);
+        function createRangeDateInput(key) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
 
-    const toLabel = document.createElement('span');
-    toLabel.className = 'range-divider';
-    toLabel.textContent = ' to ';
-    formGroup.appendChild(toLabel);
+            const startInput = document.createElement('input');
+            startInput.setAttribute('type', 'date');
+            startInput.className = 'form-control';
+            startInput.setAttribute('id', key + '_start');
+            formGroup.appendChild(startInput);
 
-    const endInput = document.createElement('input');
-    endInput.setAttribute('type', 'date');
-    endInput.className = 'form-control';
-    endInput.setAttribute('id', key + '_end');
-    formGroup.appendChild(endInput);
+            const toLabel = document.createElement('span');
+            toLabel.className = 'range-divider';
+            toLabel.textContent = ' to ';
+            formGroup.appendChild(toLabel);
 
-    const errorElement = document.createElement('span');
-    errorElement.className = 'error';
-    errorElement.setAttribute('id', key + '_error');
-    formGroup.appendChild(errorElement);
+            const endInput = document.createElement('input');
+            endInput.setAttribute('type', 'date');
+            endInput.className = 'form-control';
+            endInput.setAttribute('id', key + '_end');
+            formGroup.appendChild(endInput);
 
-    return formGroup;
-}
+            const errorElement = document.createElement('span');
+            errorElement.className = 'error';
+            errorElement.setAttribute('id', key + '_error');
+            formGroup.appendChild(errorElement);
 
-function createRangeTimeInput(key) {
-    const formGroup = document.createElement('div');
-    formGroup.className = 'form-group';
+            return formGroup;
+        }
 
-    const startInput = document.createElement('input');
-    startInput.setAttribute('type', 'time');
-    startInput.className = 'form-control';
-    startInput.setAttribute('id', key + '_start');
-    formGroup.appendChild(startInput);
+        function createRangeTimeInput(key) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
 
-    const toLabel = document.createElement('span');
-    toLabel.className = 'range-divider';
-    toLabel.textContent = ' to ';
-    formGroup.appendChild(toLabel);
+            const startInput = document.createElement('input');
+            startInput.setAttribute('type', 'time');
+            startInput.className = 'form-control';
+            startInput.setAttribute('id', key + '_start');
+            formGroup.appendChild(startInput);
 
-    const endInput = document.createElement('input');
-    endInput.setAttribute('type', 'time');
-    endInput.className = 'form-control';
-    endInput.setAttribute('id', key + '_end');
-    formGroup.appendChild(endInput);
+            const toLabel = document.createElement('span');
+            toLabel.className = 'range-divider';
+            toLabel.textContent = ' to ';
+            formGroup.appendChild(toLabel);
 
-    const errorElement = document.createElement('span');
-    errorElement.className = 'error';
-    errorElement.setAttribute('id', key + '_error');
-    formGroup.appendChild(errorElement);
+            const endInput = document.createElement('input');
+            endInput.setAttribute('type', 'time');
+            endInput.className = 'form-control';
+            endInput.setAttribute('id', key + '_end');
+            formGroup.appendChild(endInput);
 
-    return formGroup;
-}
+            const errorElement = document.createElement('span');
+            errorElement.className = 'error';
+            errorElement.setAttribute('id', key + '_error');
+            formGroup.appendChild(errorElement);
 
-        // Function to create combobox (single or multi)
+            return formGroup;
+        }
+
         function createComboBox(key, parameter) {
             const selectElement = document.createElement('select');
             selectElement.className = 'form-control';
             selectElement.setAttribute('id', key);
-
             if (parameter.mode === 'multi') {
-                selectElement.setAttribute('multiple', true);
+                selectElement.setAttribute('multiple', 'multiple');
+            } else {
+                const defaultOption = document.createElement('option');
+                defaultOption.setAttribute('value', '');
+                defaultOption.textContent = 'Select an Option';
+                selectElement.appendChild(defaultOption);
             }
 
             parameter.data.forEach(option => {
@@ -356,160 +376,132 @@ function createRangeTimeInput(key) {
             return selectElement;
         }
 
-        // Function to create checkbox (single or multi)
         function createCheckBox(key, parameter) {
-            const formGroup = document.createElement('div');
-            formGroup.className = 'form-group';
+            const container = document.createElement('div');
 
-            const outerLabel = document.createElement('label');
-            outerLabel.textContent = parameter.label;
-            formGroup.appendChild(outerLabel);
+            parameter.data.forEach((option, index) => {
+                const checkboxId = key + '_' + index;
 
-            const checkboxContainer = document.createElement('div');
+                const label = document.createElement('label');
+                label.setAttribute('for', checkboxId);
+                label.textContent = option[parameter.display];
 
-            switch (parameter.mode) {
-                case 'single':
-                    parameter.data.forEach(option => {
-                        const checkboxLabel = document.createElement('label');
-                        checkboxLabel.className = 'form-check-label';
+                const checkbox = document.createElement('input');
+                checkbox.setAttribute('type', 'checkbox');
+                checkbox.setAttribute('id', checkboxId);
+                checkbox.setAttribute('name', key);
+                checkbox.setAttribute('value', option[parameter.value]);
 
-                        const checkbox = document.createElement('input');
-                        checkbox.setAttribute('type', 'checkbox');
-                        checkbox.className = 'form-check-input';
-                        checkbox.setAttribute('value', option[parameter.value]);
-                        checkbox.setAttribute('id', `${key}_${option[parameter.value]}`);
+                checkbox.addEventListener('change', () => {
+                    if (parameter.mode === 'single') {
+                        const checkboxes = document.querySelectorAll(`input[name='${key}']`);
+                        checkboxes.forEach(cb => {
+                            if (cb !== checkbox) {
+                                cb.checked = false;
+                            }
+                        });
+                    }
+                });
 
-                        checkboxLabel.appendChild(checkbox); // Append checkbox directly to label
-                        checkboxLabel.appendChild(document.createTextNode(option[parameter.display])); // Add text node
-                        checkboxContainer.appendChild(checkboxLabel);
-                    });
-                    break;
-                case 'multi':
-                    parameter.data.forEach(option => {
-                        const checkboxLabel = document.createElement('label');
-                        checkboxLabel.className = 'form-check-label';
+                const checkboxContainer = document.createElement('div');
+                checkboxContainer.className = 'checkbox-container';
+                checkboxContainer.appendChild(label);
+                checkboxContainer.appendChild(checkbox);
 
-                        const checkbox = document.createElement('input');
-                        checkbox.setAttribute('type', 'checkbox');
-                        checkbox.className = 'form-check-input';
-                        checkbox.setAttribute('value', option[parameter.value]);
-                        checkbox.setAttribute('id', `${key}_${option[parameter.value]}`);
+                container.appendChild(checkboxContainer);
+            });
 
-                        checkboxLabel.appendChild(checkbox); // Append checkbox directly to label
-                        checkboxLabel.appendChild(document.createTextNode(option[parameter.display])); // Add text node
-                        checkboxContainer.appendChild(checkboxLabel);
-                    });
-                    break;
-                default:
-                    break;
-            }
-
-            formGroup.appendChild(checkboxContainer);
-
-            const errorElement = document.createElement('span');
-            errorElement.className = 'error';
-            errorElement.setAttribute('id', key + '_error');
-            formGroup.appendChild(errorElement);
-
-            return formGroup;
+            return container;
         }
 
-        // Function to generate HTML form elements based on parameter JSON
-        function generateFormElements() {
+        function validateInput(value, type) {
+            let regex;
+            switch (type) {
+                case 'int':
+                    regex = /^\d+$/;
+                    return regex.test(value) ? '' : 'Please enter a valid whole number.';
+                case 'amt':
+                    regex = /^\d+(\.\d{2})?$/;
+                    return regex.test(value) ? '' : 'Please enter a valid amount (e.g., 123.45).';
+                case 'pct':
+                    regex = /^\d+(\.\d+)?%?$/;
+                    return regex.test(value) ? '' : 'Please enter a valid percentage (e.g., 12.34%).';
+                default:
+                    return '';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
             const parameters = JSON.parse(document.getElementById('parameters').textContent);
             const parametersContainer = document.getElementById('parametersContainer');
 
-            Object.keys(parameters).forEach(key => {
-                const parameter = parameters[key];
+            for (const [key, parameter] of Object.entries(parameters)) {
                 const formGroup = createFormGroup(key, parameter);
                 parametersContainer.appendChild(formGroup);
-            });
-        }
+            }
 
-        // Function to handle form submission
-        function handleSubmit() {
-            const parameters = JSON.parse(document.getElementById('parameters').textContent);
-            // const query = document.getElementById('query').textContent; // Uncomment if you have a query element
+            document.getElementById('submitButton').addEventListener('click', function (event) {
+                event.preventDefault(); // Prevent default form submission behavior (if any)
 
-            const formData = {};
-            let error = false;
+                const formData = {};
+                let formValid = true;
 
-            Object.keys(parameters).forEach(key => {
-                const parameter = parameters[key];
-                const value = getValue(key, parameter);
+                for (const key of Object.keys(parameters)) {
+                    const inputElement = document.getElementById(key);
+                    if (inputElement) {
+                        const value = inputElement.value;
+                        if (parameters[key].type === 'int' || parameters[key].type === 'amt' || parameters[key].type === 'pct') {
+                            const error = validateInput(value, parameters[key].type);
+                            const errorElement = document.getElementById(key + '_error');
+                            errorElement.textContent = error;
+                            if (error) formValid = false;
+                        }
+                        formData[key] = value;
+                    }
 
-                // Check if required and validate
-                if (parameter.required && !value) {
-                    document.getElementById(key + '_error').textContent = 'This field is required';
-                    error = true;
-                } else {
-                    formData[key] = value;
-                    document.getElementById(key + '_error').textContent = '';
+                    const startElement = document.getElementById(key + '_start');
+                    const endElement = document.getElementById(key + '_end');
+                    if (startElement && endElement) {
+                        const startValue = startElement.value;
+                        const endValue = endElement.value;
+
+                        if (parameters[key].type === 'int' || parameters[key].type === 'amt' || parameters[key].type === 'pct') {
+                            const startError = validateInput(startValue, parameters[key].type);
+                            const endError = validateInput(endValue, parameters[key].type);
+                            const errorElement = document.getElementById(key + '_error');
+                            errorElement.textContent = startError || endError;
+                            if (startError || endError) formValid = false;
+                        }
+
+                        formData[key] = {
+                            start: startValue,
+                            end: endValue
+                        };
+                    }
                 }
+
+                // Handle checkbox fields
+                for (const key of Object.keys(parameters)) {
+                    if (parameters[key].type === 'checkbox') {
+                        const checkboxes = document.querySelectorAll(`input[name='${key}']:checked`);
+                        formData[key] = Array.from(checkboxes).map(checkbox => checkbox.value);
+                    }
+                }
+
+                if (formValid) {
+                    console.log(formData); // Log formData to console
+                    document.getElementById('submitMessage').textContent = 'Form Successfully Submitted!';
+                } else {
+                    document.getElementById('submitMessage').textContent = 'Please correct the errors and try again.';
+                }
+
+                // Clear the form after submission (optional)
+                // parametersContainer.innerHTML = '';
+
+                // Display the results in the #results div
+                // document.getElementById('results').textContent = JSON.stringify(formData, null, 2);
             });
-
-            if (!error) {
-                // Process form data (e.g., submit via AJAX, generate query)
-                console.log('Form data:', formData);
-                document.getElementById('results').textContent = 'Form submitted successfully!';
-            } else {
-                document.getElementById('results').textContent = 'Please correct the errors in the form.';
-            }
-        }
-
-        // Function to get value from form element based on type and mode
-        function getValue(key, parameter) {
-            let value;
-            switch (parameter.type) {
-                case 'date':
-                case 'time':
-                case 'timestamp':
-                    if (parameter.mode === 'range') {
-                        const startValue = document.getElementById(key + '_start').value;
-                        const endValue = document.getElementById(key + '_end').value;
-                        value = { start: startValue, end: endValue };
-                    } else {
-                        value = document.getElementById(key).value;
-                    }
-                    break;
-                case 'int':
-                case 'pct':
-                case 'amt':
-                    if (parameter.mode === 'range') {
-                        const startValue = document.getElementById(key + '_start').value;
-                        const endValue = document.getElementById(key + '_end').value;
-                        value = { start: startValue, end: endValue };
-                    } else {
-                        value = document.getElementById(key).value;
-                    }
-                    break;
-                case 'combobox':
-                    const selectElement = document.getElementById(key);
-                    if (parameter.mode === 'single') {
-                        value = selectElement.value;
-                    } else {
-                        value = Array.from(selectElement.selectedOptions).map(option => option.value);
-                    }
-                    break;
-                case 'checkbox':
-                    const checkboxes = document.querySelectorAll(`#${key} input[type="checkbox"]:checked`);
-                    if (parameter.mode === 'single') {
-                        value = checkboxes.length > 0 ? checkboxes[0].value : '';
-                    } else {
-                        value = Array.from(checkboxes).map(checkbox => checkbox.value);
-                    }
-                    break;
-                default:
-                    value = document.getElementById(key).value;
-            }
-            return value;
-        }
-
-        // Event listener for form submission
-        document.getElementById('submitButton').addEventListener('click', handleSubmit);
-
-        // Generate form elements on page load
-        generateFormElements();
+        });
     </script>
 </body>
 </html>
