@@ -49,9 +49,10 @@
             width: 100%;
         }
         .checkbox-container label {
-            margin-bottom: 0;
+            margin-bottom: 10px;
             width: auto;
             margin-right: 10px;
+            display: block;
         }
         .checkbox-container input[type="checkbox"] {
             margin-left: 10px;
@@ -59,6 +60,17 @@
         #submitMessage {
             color: green;
             margin-top: 10px;
+        }
+        .helper-text {
+            font-size: 0.9em;
+            margin-top: 5px;
+            color: #6c757d; /* Optional: for a subtle color */
+            white-space: nowrap;
+            position: absolute; /* Change to relative */
+            display: inline-block; /* Ensures it behaves like a block element */
+            margin-top: 105px; /* Adjust based on your layout */
+            left: 155px; /* Adjust based on your layout */
+            vertical-align: middle;
         }
     </style>
 </head>
@@ -87,17 +99,20 @@
         "number_01": {
             "label": "Number Range",
             "type": "int",
-            "mode": "range"
+            "mode": "range",
+            "required": true
         },
         "number_02": {
             "label": "Percent Range",
             "type": "pct",
-            "mode": "range"
+            "mode": "range",
+            "required": true
         },
         "number_03": {
             "label": "Amount Range",
             "type": "amt",
-            "mode": "range"
+            "mode": "range",
+            "required": true
         },
         "combo_01": {
             "label": "Combo Box (Single)",
@@ -215,6 +230,12 @@
                     inputElement = createComboBox(key, parameter);
                     inputElement.setAttribute('id', key); // Set id for select element
                     formGroup.appendChild(inputElement);
+                    if (parameter.mode === 'multi') {
+                        const helperText = document.createElement('label');
+                        helperText.textContent = 'Control-click to multi-select';
+                        helperText.className = 'helper-text'; // class for styling 
+                        formGroup.appendChild(helperText);
+                    }
                     break;
                 case 'checkbox':
                     inputElement = createCheckBox(key, parameter);
@@ -254,35 +275,6 @@
 
             const endInput = document.createElement('input');
             endInput.setAttribute('type', 'text');
-            endInput.className = 'form-control';
-            endInput.setAttribute('id', key + '_end');
-            formGroup.appendChild(endInput);
-
-            const errorElement = document.createElement('span');
-            errorElement.className = 'error';
-            errorElement.setAttribute('id', key + '_error');
-            formGroup.appendChild(errorElement);
-
-            return formGroup;
-        }
-
-        function createRangeTimestampInput(key) {
-            const formGroup = document.createElement('div');
-            formGroup.className = 'form-group';
-
-            const startInput = document.createElement('input');
-            startInput.setAttribute('type', 'datetime-local'); // Use datetime-local for timestamp
-            startInput.className = 'form-control';
-            startInput.setAttribute('id', key + '_start');
-            formGroup.appendChild(startInput);
-
-            const toLabel = document.createElement('span');
-            toLabel.className = 'range-divider';
-            toLabel.textContent = ' to ';
-            formGroup.appendChild(toLabel);
-
-            const endInput = document.createElement('input');
-            endInput.setAttribute('type', 'datetime-local'); // Use datetime-local for timestamp
             endInput.className = 'form-control';
             endInput.setAttribute('id', key + '_end');
             formGroup.appendChild(endInput);
@@ -353,153 +345,231 @@
             return formGroup;
         }
 
+        function createRangeTimestampInput(key) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+
+            const startInput = document.createElement('input');
+            startInput.setAttribute('type', 'datetime-local');
+            startInput.className = 'form-control';
+            startInput.setAttribute('id', key + '_start');
+            formGroup.appendChild(startInput);
+
+            const toLabel = document.createElement('span');
+            toLabel.className = 'range-divider';
+            toLabel.textContent = ' to ';
+            formGroup.appendChild(toLabel);
+
+            const endInput = document.createElement('input');
+            endInput.setAttribute('type', 'datetime-local');
+            endInput.className = 'form-control';
+            endInput.setAttribute('id', key + '_end');
+            formGroup.appendChild(endInput);
+
+            const errorElement = document.createElement('span');
+            errorElement.className = 'error';
+            errorElement.setAttribute('id', key + '_error');
+            formGroup.appendChild(errorElement);
+
+            return formGroup;
+        }
+
         function createComboBox(key, parameter) {
             const selectElement = document.createElement('select');
             selectElement.className = 'form-control';
-            selectElement.setAttribute('id', key);
             if (parameter.mode === 'multi') {
                 selectElement.setAttribute('multiple', 'multiple');
             } else {
-                const defaultOption = document.createElement('option');
-                defaultOption.setAttribute('value', '');
-                defaultOption.textContent = 'Select an Option';
-                selectElement.appendChild(defaultOption);
+                const placeholderOption = document.createElement('option');
+                placeholderOption.text = 'Select an Option';
+                placeholderOption.value = '';
+                selectElement.add(placeholderOption);
             }
 
             parameter.data.forEach(option => {
                 const optionElement = document.createElement('option');
-                optionElement.setAttribute('value', option[parameter.value]);
-                optionElement.textContent = option[parameter.display];
-                selectElement.appendChild(optionElement);
+                optionElement.value = option[parameter.value];
+                optionElement.text = option[parameter.display];
+                selectElement.add(optionElement);
             });
 
             return selectElement;
         }
 
         function createCheckBox(key, parameter) {
-            const container = document.createElement('div');
+            const checkboxContainer = document.createElement('div');
+            checkboxContainer.className = 'checkbox-container';
 
-            parameter.data.forEach((option, index) => {
-                const checkboxId = key + '_' + index;
+            parameter.data.forEach(option => {
+                const checkboxLabel = document.createElement('label');
+                checkboxLabel.textContent = option[parameter.display];
 
-                const label = document.createElement('label');
-                label.setAttribute('for', checkboxId);
-                label.textContent = option[parameter.display];
+                const checkboxElement = document.createElement('input');
+                checkboxElement.setAttribute('type', 'checkbox');
+                checkboxElement.setAttribute('name', key);
+                checkboxElement.setAttribute('value', option[parameter.value]);
 
-                const checkbox = document.createElement('input');
-                checkbox.setAttribute('type', 'checkbox');
-                checkbox.setAttribute('id', checkboxId);
-                checkbox.setAttribute('name', key);
-                checkbox.setAttribute('value', option[parameter.value]);
-
-                checkbox.addEventListener('change', () => {
-                    if (parameter.mode === 'single') {
-                        const checkboxes = document.querySelectorAll(`input[name='${key}']`);
-                        checkboxes.forEach(cb => {
-                            if (cb !== checkbox) {
-                                cb.checked = false;
-                            }
+                if (parameter.mode === 'single') {
+                    checkboxElement.addEventListener('change', (e) => {
+                        document.querySelectorAll(`input[name=${key}]`).forEach(cb => {
+                            if (cb !== e.target) cb.checked = false;
                         });
-                    }
-                });
+                    });
+                }
 
-                const checkboxContainer = document.createElement('div');
-                checkboxContainer.className = 'checkbox-container';
-                checkboxContainer.appendChild(label);
-                checkboxContainer.appendChild(checkbox);
-
-                container.appendChild(checkboxContainer);
+                checkboxLabel.appendChild(checkboxElement);
+                checkboxContainer.appendChild(checkboxLabel);
             });
 
-            return container;
+            return checkboxContainer;
         }
 
-        function validateInput(value, type) {
-            let regex;
-            switch (type) {
-                case 'int':
-                    regex = /^\d+$/;
-                    return regex.test(value) ? '' : 'Please enter a valid whole number.';
-                case 'amt':
-                    regex = /^\d+(\.\d{2})?$/;
-                    return regex.test(value) ? '' : 'Please enter a valid amount (e.g., 123.45).';
-                case 'pct':
-                    regex = /^\d+(\.\d+)?%?$/;
-                    return regex.test(value) ? '' : 'Please enter a valid percentage (e.g., 12.34%).';
-                default:
-                    return '';
+        function isValidInput(element) {
+            return element.value.trim() !== '';
+        }
+
+        function validateNumberRange(key, parameter) {
+            const startInput = document.getElementById(key + '_start');
+            const endInput = document.getElementById(key + '_end');
+            const errorElement = document.getElementById(key + '_error');
+
+            if (!isValidInput(startInput) || !isValidInput(endInput)) {
+                errorElement.textContent = 'Both start and end values are required.';
+                return false;
             }
+
+            const startValue = parseFloat(startInput.value);
+            const endValue = parseFloat(endInput.value);
+
+            if (isNaN(startValue) || isNaN(endValue)) {
+                errorElement.textContent = 'Both start and end values must be valid numbers.';
+                return false;
+            }
+
+            if (parameter.type === 'pct' && (startValue < 0 || startValue > 100 || endValue < 0 || endValue > 100)) {
+                errorElement.textContent = 'Values must be between 0 and 100 for percentage.';
+                return false;
+            }
+
+            if (parameter.type === 'int' && (startValue < 0 || endValue < 0)) {
+                errorElement.textContent = 'Values must be greater than 0.';
+                return false;
+            }
+
+            if (startValue > endValue) {
+                errorElement.textContent = 'Start value cannot be greater than end value.';
+                return false;
+            }
+
+            errorElement.textContent = '';
+            return true;
+        }
+
+        function validateForm(parameters) {
+            let isValid = true;
+
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                if (parameter.required) {
+                    if (parameter.type === 'checkbox' && parameter.mode === 'multi') {
+                        const checkboxes = document.querySelectorAll(`input[name=${key}]:checked`);
+                        if (checkboxes.length === 0) {
+                            document.getElementById(key + '_error').textContent = 'At least one option must be selected.';
+                            isValid = false;
+                        } else {
+                            document.getElementById(key + '_error').textContent = '';
+                        }
+                    } else if (parameter.type === 'int' || parameter.type === 'pct' || parameter.type === 'amt') {
+                        if (parameter.mode === 'range') {
+                            if (!validateNumberRange(key, parameter)) {
+                                isValid = false;
+                            }
+                        } else {
+                            const element = document.getElementById(key);
+                            if (element && !isValidInput(element)) {
+                                document.getElementById(key + '_error').textContent = 'This field is required.';
+                                isValid = false;
+                            } else {
+                                document.getElementById(key + '_error').textContent = '';
+                            }
+                        }
+                    } else {
+                        const element = document.getElementById(key);
+                        if (element && !isValidInput(element)) {
+                            document.getElementById(key + '_error').textContent = 'This field is required.';
+                            isValid = false;
+                        } else {
+                            document.getElementById(key + '_error').textContent = '';
+                        }
+                    }
+                }
+            });
+
+            return isValid;
+        }
+
+        function handleSubmit(parameters) {
+            if (!validateForm(parameters)) {
+                return;
+            }
+
+            const formData = {};
+
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                let value = null;
+
+                if (parameter.type === 'checkbox' && parameter.mode === 'multi') {
+                    value = Array.from(document.querySelectorAll(`input[name=${key}]:checked`)).map(cb => cb.value);
+                } else if (parameter.type === 'checkbox' && parameter.mode === 'single') {
+                    const selectedCheckbox = document.querySelector(`input[name=${key}]:checked`);
+                    value = selectedCheckbox ? selectedCheckbox.value : null;
+                } else if (parameter.type === 'combobox' && parameter.mode === 'multi') {
+                    value = Array.from(document.getElementById(key).selectedOptions).map(option => option.value);
+                } else if (parameter.type === 'combobox' && parameter.mode === 'single') {
+                    value = document.getElementById(key).value;
+                } else if (parameter.type === 'date' && parameter.mode === 'range') {
+                    value = {
+                        start: document.getElementById(key + '_start').value,
+                        end: document.getElementById(key + '_end').value
+                    };
+                } else if (parameter.type === 'time' && parameter.mode === 'range') {
+                    value = {
+                        start: document.getElementById(key + '_start').value,
+                        end: document.getElementById(key + '_end').value
+                    };
+                } else if (parameter.type === 'timestamp' && parameter.mode === 'range') {
+                    value = {
+                        start: document.getElementById(key + '_start').value,
+                        end: document.getElementById(key + '_end').value
+                    };
+                } else if ((parameter.type === 'int' || parameter.type === 'pct' || parameter.type === 'amt') && parameter.mode === 'range') {
+                    value = {
+                        start: document.getElementById(key + '_start').value,
+                        end: document.getElementById(key + '_end').value
+                    };
+                } else {
+                    value = document.getElementById(key).value;
+                }
+
+                formData[key] = value;
+            });
+
+            console.log('Form Data:', formData);
+            document.getElementById('submitMessage').textContent = 'Form submitted successfully!';
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             const parameters = JSON.parse(document.getElementById('parameters').textContent);
             const parametersContainer = document.getElementById('parametersContainer');
 
-            for (const [key, parameter] of Object.entries(parameters)) {
-                const formGroup = createFormGroup(key, parameter);
+            Object.keys(parameters).forEach(key => {
+                const formGroup = createFormGroup(key, parameters[key]);
                 parametersContainer.appendChild(formGroup);
-            }
+            });
 
-            document.getElementById('submitButton').addEventListener('click', function (event) {
-                event.preventDefault(); // Prevent default form submission behavior (if any)
-
-                const formData = {};
-                let formValid = true;
-
-                for (const key of Object.keys(parameters)) {
-                    const inputElement = document.getElementById(key);
-                    if (inputElement) {
-                        const value = inputElement.value;
-                        if (parameters[key].type === 'int' || parameters[key].type === 'amt' || parameters[key].type === 'pct') {
-                            const error = validateInput(value, parameters[key].type);
-                            const errorElement = document.getElementById(key + '_error');
-                            errorElement.textContent = error;
-                            if (error) formValid = false;
-                        }
-                        formData[key] = value;
-                    }
-
-                    const startElement = document.getElementById(key + '_start');
-                    const endElement = document.getElementById(key + '_end');
-                    if (startElement && endElement) {
-                        const startValue = startElement.value;
-                        const endValue = endElement.value;
-
-                        if (parameters[key].type === 'int' || parameters[key].type === 'amt' || parameters[key].type === 'pct') {
-                            const startError = validateInput(startValue, parameters[key].type);
-                            const endError = validateInput(endValue, parameters[key].type);
-                            const errorElement = document.getElementById(key + '_error');
-                            errorElement.textContent = startError || endError;
-                            if (startError || endError) formValid = false;
-                        }
-
-                        formData[key] = {
-                            start: startValue,
-                            end: endValue
-                        };
-                    }
-                }
-
-                // Handle checkbox fields
-                for (const key of Object.keys(parameters)) {
-                    if (parameters[key].type === 'checkbox') {
-                        const checkboxes = document.querySelectorAll(`input[name='${key}']:checked`);
-                        formData[key] = Array.from(checkboxes).map(checkbox => checkbox.value);
-                    }
-                }
-
-                if (formValid) {
-                    console.log(formData); // Log formData to console
-                    document.getElementById('submitMessage').textContent = 'Form Successfully Submitted!';
-                } else {
-                    document.getElementById('submitMessage').textContent = 'Please correct the errors and try again.';
-                }
-
-                // Clear the form after submission (optional)
-                // parametersContainer.innerHTML = '';
-
-                // Display the results in the #results div
-                // document.getElementById('results').textContent = JSON.stringify(formData, null, 2);
+            document.getElementById('submitButton').addEventListener('click', function () {
+                handleSubmit(parameters);
             });
         });
     </script>
