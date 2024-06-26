@@ -514,51 +514,54 @@
             }
 
             const formData = {};
+            const orderedFormData = {};
 
-            Object.keys(parameters).forEach(key => {
-                const parameter = parameters[key];
-                let value = null;
+        // Collect form data
+        Object.keys(parameters).forEach(key => {
+            const parameter = parameters[key];
 
-                if (parameter.type === 'checkbox' && parameter.mode === 'multi') {
-                    value = Array.from(document.querySelectorAll(`input[name=${key}]:checked`)).map(cb => cb.value);
-                } else if (parameter.type === 'checkbox' && parameter.mode === 'single') {
-                    const selectedCheckbox = document.querySelector(`input[name=${key}]:checked`);
-                    value = selectedCheckbox ? selectedCheckbox.value : null;
-                } else if (parameter.type === 'combobox' && parameter.mode === 'multi') {
-                    value = Array.from(document.getElementById(key).selectedOptions).map(option => option.value);
-                } else if (parameter.type === 'combobox' && parameter.mode === 'single') {
-                    value = document.getElementById(key).value;
-                } else if (parameter.type === 'date' && parameter.mode === 'range') {
-                    value = {
-                        start: document.getElementById(key + '_start').value,
-                        end: document.getElementById(key + '_end').value
-                    };
-                } else if (parameter.type === 'time' && parameter.mode === 'range') {
-                    value = {
-                        start: document.getElementById(key + '_start').value,
-                        end: document.getElementById(key + '_end').value
-                    };
-                } else if (parameter.type === 'timestamp' && parameter.mode === 'range') {
-                    value = {
-                        start: document.getElementById(key + '_start').value,
-                        end: document.getElementById(key + '_end').value
-                    };
-                } else if ((parameter.type === 'int' || parameter.type === 'pct' || parameter.type === 'amt') && parameter.mode === 'range') {
-                    value = {
-                        start: document.getElementById(key + '_start').value,
-                        end: document.getElementById(key + '_end').value
-                    };
-                } else {
-                    value = document.getElementById(key).value;
-                }
+            if (parameter.type === 'checkbox' && parameter.mode === 'multi') {
+                const value = Array.from(document.querySelectorAll(`input[name=${key}]:checked`)).map(cb => cb.value);
+                formData[key] = value.join(','); // Join values into a comma-separated string
+            } else if (parameter.type === 'checkbox' && parameter.mode === 'single') {
+                const selectedCheckbox = document.querySelector(`input[name=${key}]:checked`);
+                formData[key] = selectedCheckbox ? selectedCheckbox.value : null;
+            } else if (parameter.type === 'combobox' && parameter.mode === 'multi') {
+                const value = Array.from(document.getElementById(key).selectedOptions).map(option => option.value);
+                formData[key] = value.join(','); // Join values into a comma-separated string
+            } else if (parameter.type === 'combobox' && parameter.mode === 'single') {
+                formData[key] = document.getElementById(key).value;
+            } else if (parameter.type === 'date' && parameter.mode === 'range') {
+                formData[key + '_start'] = document.getElementById(key + '_start').value;
+                formData[key + '_end'] = document.getElementById(key + '_end').value;
+            } else if (parameter.type === 'time' && parameter.mode === 'range') {
+                formData[key + '_start'] = document.getElementById(key + '_start').value;
+                formData[key + '_end'] = document.getElementById(key + '_end').value;
+            } else if (parameter.type === 'timestamp' && parameter.mode === 'range') {
+                formData[key + '_start'] = document.getElementById(key + '_start').value;
+                formData[key + '_end'] = document.getElementById(key + '_end').value;
+            } else if ((parameter.type === 'int' || parameter.type === 'pct' || parameter.type === 'amt') && parameter.mode === 'range') {
+                formData[key + '_start'] = document.getElementById(key + '_start').value;
+                formData[key + '_end'] = document.getElementById(key + '_end').value;
+            } else {
+                formData[key] = document.getElementById(key).value;
+            }
+        });
 
-                formData[key] = value;
-            });
+        // Order formData to ensure _start fields come before _end fields
+        Object.keys(formData).sort((a, b) => {
+            // Custom sorting logic to ensure _start keys come before _end keys
+            if (a.endsWith('_start') && b.endsWith('_end')) return -1;
+            if (a.endsWith('_end') && b.endsWith('_start')) return 1;
+            return a.localeCompare(b); // Default alphanumeric sorting for other keys
+        }) 
+            .forEach(key => {
+            orderedFormData[key] = formData[key];
+        });
 
-            console.log('Form Data:', formData);
-            document.getElementById('submitMessage').textContent = 'Form submitted successfully!';
-        }
-
+    console.log('Form Data:', orderedFormData);
+    document.getElementById('submitMessage').textContent = 'Form submitted successfully!';
+}
         document.addEventListener('DOMContentLoaded', function () {
             const parameters = JSON.parse(document.getElementById('parameters').textContent);
             const parametersContainer = document.getElementById('parametersContainer');
