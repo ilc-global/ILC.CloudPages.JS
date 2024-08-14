@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="DB Generation Primitives 7 ver.2">
+    <title>Parameter HTML Generation</title>
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .required-asterisk {
+            color: red;
+            margin-left: 5px;
+        }
+        .autocomplete-results {
+            position: absolute;
+            border: 1px solid #ddd;
+            max-height: 150px;
+            overflow-y: auto;
+            background: white;
+            width: 100%;
+            z-index: 1000;
+            display: none;
+        }
+        .autocomplete-results div {
+            padding: 10px;
+            cursor: pointer;
+        }
+        .autocomplete-results div:hover {
+            background-color: #f0f0f0;
+        }
+        .autocomplete-results .highlight {
+            background-color: blue;
+            color: white;
+        }
+        .autocomplete-container {
+            position: relative;
+        }
+        .checkbox-container label {
+            font-weight: normal;
+            display: block;
+        }
+        label {
+            font-weight: bold;
+        }
+        .predictive-text {
+            color: blue;
+        }
+        .checkbox-container label {
+            display: block;
+            margin-bottom: 5px; /* Adjust as needed */
+        }
+        .checkbox-container input[type="checkbox"] {
+            margin-right: 5px; /* Adjust as needed */
+        }
+        .helper-text {
+            font-size: 0.9em;
+            margin-top: 5px;
+            color: #6c757d; 
+            white-space: nowrap;
+            position: absolute; 
+            display: inline-block; 
+            margin-top: 30px; 
+            left: 38px; 
+            vertical-align: left;
+        }    
+        .success-message {
+            color: green;
+        }
+
+        .error-message {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div id="parametersContainer" class="container"></div>
+    <button id="submitButton" class="btn btn-primary">Run</button>
+    <div id="submitMessage"></div>
+
+    <script id="parameters" type="application/json">
+    {
+        "combo_01" : {
+            "label" : "Combo Box (Single)",
+            "type" : "combobox",
+            "mode" : "single",
+            "sql" : "select id,name,description from inventorylogtype",
+            "value" : "id",
+            "display" : "name,description",
+            "required" : true
+        },
+        "combo_02" : {
+            "label" : "Combo Box (Multi)",
+            "type" : "combobox",
+            "mode" : "multi",
+            "sql" : "select id,name,description from inventorylogtype",
+            "value" : "id",
+            "display" : "name,description"
+        },
+        "combo_03" : {
+            "label" : "Combo Box Auto Complete",
+            "type" : "autocomplete",
+            "mode" : "multi",
+            "sql" : "select id,name,description from inventorylogtype",
+            "value" : "id",
+            "display" : "name,description",
+            "search" : "description",
+            "minChars" : 0
+        },
+        "combo_04" : {
+            "label" : "Combo Box Auto Complete Lazy",
+            "type" : "autocomplete",
+            "mode" : "multi",
+            "sql" : "select id,name,description from inventorylogtype where description like '%@input%'",
+            "value" : "id",
+            "display" : "name,description",
+            "search" : "description",
+            "lazy" : true,
+            "minChars" : 0
+        },
+        "check_01" : {
+            "label" : "Checkbox (Single)",
+            "type" : "checkbox",
+            "mode" : "single",
+            "sql" : "select id,name,description from inventorylogtype",
+            "value" : "id",
+            "display" : "name,description"
+        },
+        "check_02" : {
+            "label" : "Checkbox (Multi)",
+            "type" : "checkbox",
+            "mode" : "multi",
+            "sql" : "select id,name,description from inventorylogtype",
+            "value" : "id",
+            "display" : "name,description"
+        }
+    }
+    </script>
+
+    <script>
+        function validateParameters(parameters) {
+            let isValid = true;
+    
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                const element = document.getElementById(key);
+                const errorElement = document.getElementById(key + '_error');
+    
+                if (element) {
+                    if (!errorElement) {
+                        const newErrorElement = document.createElement('div');
+                        newErrorElement.setAttribute('id', key + '_error');
+                        newErrorElement.className = 'text-danger';
+                        element.parentNode.appendChild(newErrorElement);
+                    } else {
+                        errorElement.textContent = '';
+                    }
+    
+                    if (parameter.required && (!element.value || element.value === 'Select an option')) {
+                        const newErrorElement = document.getElementById(key + '_error');
+                        newErrorElement.textContent = `${parameter.label} is required.`;
+                        isValid = false;
+                    }       
+                }
+            });
+    
+            return isValid;
+        }
+    
+        function collectParameterValues(parameters) {
+            const values = {};
+    
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                const element = document.getElementById(key);
+    
+                if (element) {
+                    if (parameter.type === 'combobox' && parameter.mode === 'multi') {
+                        const selectedOptions = Array.from(element.selectedOptions).map(option => option.value);
+                        values[key] = selectedOptions.filter(value => value !== 'Select an option');
+                    } else if (parameter.type === 'checkbox') {
+                        const checkboxes = document.querySelectorAll(`#${key} input[type="checkbox"]`);
+                        const checkedValues = Array.from(checkboxes).filter(checkbox => checkbox.checked).map(checkbox => checkbox.value);
+                        values[key] = checkedValues.length > 0 ? checkedValues : undefined;
+                    } else if (parameter.type === 'combobox') {
+                        values[key] = element.value !== 'Select an option' ? element.value : undefined;
+                    } else if (parameter.type === 'autocomplete') {
+                        values[key] = element.dataset.id || undefined;
+                    } else {
+                        values[key] = element.value;
+                    }
+                }
+            });
+            return values;
+        }
+    
+        function createFormGroup(key, parameter) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group row';
+    
+            const labelElement = document.createElement('label');
+            labelElement.className = 'col-sm-4 col-form-label';
+            labelElement.textContent = parameter.label;
+            if (parameter.required) {
+                const asterisk = document.createElement('span');
+                asterisk.textContent = '*';
+                asterisk.className = 'required-asterisk';
+                labelElement.appendChild(asterisk);
+            }
+            formGroup.appendChild(labelElement);
+    
+            const inputContainer = document.createElement('div');
+            inputContainer.className = 'col-sm-8';
+    
+            let inputElement;
+            switch (parameter.type) {
+                case 'combobox':
+                    inputElement = createComboBox(key, parameter);
+                    inputContainer.appendChild(inputElement);
+                    if (parameter.mode === 'multi') {
+                        const helperText = document.createElement('label');
+                        helperText.textContent = 'Control-click to multi-select';
+                        helperText.className = 'helper-text';
+                        formGroup.appendChild(helperText);
+                    }
+                    break;
+                case 'checkbox':
+                    inputElement = createCheckBox(key, parameter);
+                    inputContainer.appendChild(inputElement);
+                    break;
+                case 'autocomplete':
+                    inputElement = createAutocomplete(key, parameter);
+                    inputContainer.appendChild(inputElement);
+                    break;
+                default:
+                    inputElement = createInputElement(key, 'text');
+                    inputContainer.appendChild(inputElement);
+            }
+    
+            formGroup.appendChild(inputContainer);
+    
+            return formGroup;
+        }
+    
+        function createComboBox(key, parameter) {
+            const comboBox = document.createElement('select');
+            comboBox.className = 'form-control';
+            comboBox.setAttribute('id', key);
+            if (parameter.required) {
+                comboBox.setAttribute('required', 'required');
+            }
+            if (parameter.mode === 'multi') {
+                comboBox.setAttribute('multiple', 'multiple');
+            }
+    
+            const defaultOption = document.createElement('option');
+            defaultOption.textContent = 'Select an option';
+            defaultOption.disabled = true;
+            defaultOption.selected = true;
+            defaultOption.setAttribute('value', '');
+            comboBox.appendChild(defaultOption);
+    
+            var results = fb_client.runQuery(parameter.sql);
+            var results_obj = JSON.parse(results);
+    
+            results_obj.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.setAttribute('value', option[parameter.value]);
+                optionElement.textContent = `${option.name}, ${option.description}`;
+                comboBox.appendChild(optionElement);
+            });
+    
+            return comboBox;
+        }
+    
+        function createAutocomplete(key, parameter) {
+            const autocompleteContainer = document.createElement('div');
+            autocompleteContainer.className = 'autocomplete-container';
+    
+            const autocompleteInput = document.createElement('input');
+            autocompleteInput.setAttribute('type', 'text');
+            autocompleteInput.setAttribute('id', key);
+            autocompleteInput.className = 'form-control';
+            autocompleteInput.setAttribute('placeholder', 'Type to search...');
+            autocompleteContainer.appendChild(autocompleteInput);
+    
+            const resultsContainer = document.createElement('div');
+            resultsContainer.className = 'autocomplete-results';
+            autocompleteContainer.appendChild(resultsContainer);
+    
+            autocompleteInput.addEventListener('input', function(event) {
+                const inputValue = this.value.trim().toLowerCase();
+    
+                if (parameter.lazy && inputValue.length >= parameter.minChars) {
+                    var lazyResults = fb_client.runQuery(parameter.sql.replace('@input', inputValue));
+                    var lazyResults_obj = JSON.parse(lazyResults);
+                    performAutocompleteSearch(key, parameter, inputValue, lazyResults_obj, resultsContainer, autocompleteInput);
+                } else if (!parameter.lazy) {
+                    var results = fb_client.runQuery(parameter.sql);
+                    var results_obj = JSON.parse(results);
+                    performAutocompleteSearch(key, parameter, inputValue, results_obj, resultsContainer, autocompleteInput);
+                } else {
+                    clearAutocompleteResults(resultsContainer);
+                }
+                selectedIndex = -1; // Reset the selected index when the input changes
+            });
+    
+            autocompleteInput.addEventListener('keydown', function(event) {
+                const results = resultsContainer.children;
+                if (event.key === 'ArrowDown') {
+                    selectedIndex = (selectedIndex + 1) % results.length;
+                    updateHighlight(results, selectedIndex);
+                } else if (event.key === 'ArrowUp') {
+                    selectedIndex = (selectedIndex - 1 + results.length) % results.length;
+                    updateHighlight(results, selectedIndex);
+                } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (results.length > 0 && selectedIndex >= 0) {
+                        const selectedItem = results[selectedIndex];
+                        autocompleteInput.value = selectedItem.textContent;
+                        autocompleteInput.dataset.id = selectedItem.dataset.id;
+                        clearAutocompleteResults(resultsContainer);
+                    }
+                } else if (event.key === 'Tab') {
+                    event.preventDefault();
+                    if (results.length > 0) {
+                        selectedIndex = (selectedIndex + 1) % results.length;
+                        updateHighlight(results, selectedIndex);
+                    }
+                } else if (event.key === 'Backspace') {
+                    // Prevent the default behavior of backspace in the input field
+                    event.preventDefault();
+        
+                    // Get the current value of the input
+                    const currentValue = autocompleteInput.value;
+                    
+                    // Determine the position of the cursor in the input
+                    const cursorPosition = autocompleteInput.selectionStart;
+                    
+                    // Check if there is text to delete before the cursor
+                    if (cursorPosition > 0) {
+                        // Remove the character before the cursor
+                        const newValue = currentValue.slice(0, cursorPosition - 1) + currentValue.slice(cursorPosition);
+                        
+                        // Update the input value
+                        autocompleteInput.value = newValue;
+                        
+                        // Update the selection range to maintain cursor position
+                        autocompleteInput.setSelectionRange(cursorPosition - 1, cursorPosition - 1);
+                    }
+                }
+            });
+    
+            return autocompleteContainer;
+        }
+    
+        function createCheckBox(key, parameter) {
+            const checkBoxContainer = document.createElement('div');
+            checkBoxContainer.className = 'checkbox-container';
+            checkBoxContainer.setAttribute('id', key);
+    
+            var results = fb_client.runQuery(parameter.sql);
+            var results_obj = JSON.parse(results);
+    
+            // Track the currently selected checkbox
+            let selectedCheckbox = null;
+    
+            results_obj.forEach(option => {
+                const label = document.createElement('label');
+    
+                const checkBox = document.createElement('input');
+                checkBox.setAttribute('type', 'checkbox');
+                checkBox.setAttribute('value', option[parameter.value]);
+    
+                // Check if the current checkbox should be pre-selected based on value
+                if (parameter.mode === 'single' && parameter.value === option[parameter.value]) {
+                    checkBox.checked = true;
+                    selectedCheckbox = checkBox;
+                }
+    
+                // Event listener to handle single selection
+                checkBox.addEventListener('change', function() {
+                    if (parameter.mode === 'single') {
+                        if (this.checked && this !== selectedCheckbox) {
+                            if (selectedCheckbox) {
+                                selectedCheckbox.checked = false;
+                            }
+                            selectedCheckbox = this;
+                        } else if (!this.checked && this === selectedCheckbox) {
+                            selectedCheckbox = null;
+                        }
+                    }
+                });
+    
+                label.appendChild(checkBox);
+    
+                const text = document.createTextNode(`${option.name}, ${option.description}`);
+                label.appendChild(text);
+    
+                checkBoxContainer.appendChild(label);
+            });
+    
+            return checkBoxContainer;
+        }
+    
+        function createInputElement(id, type) {
+            const input = document.createElement('input');
+            input.setAttribute('type', type);
+            input.className = 'form-control';
+            input.setAttribute('id', id);
+    
+            return input;
+        }
+    
+        function clearAutocompleteResults(resultsContainer) {
+            while (resultsContainer.firstChild) {
+                resultsContainer.removeChild(resultsContainer.firstChild);
+            }
+            resultsContainer.style.display = 'none';
+        }
+    
+        function performAutocompleteSearch(key, parameter, inputValue, results_obj, resultsContainer, inputElement) {
+            const filteredData = results_obj.filter(option =>
+                option[parameter.search].toLowerCase().includes(inputValue)
+            );
+    
+            clearAutocompleteResults(resultsContainer);
+    
+            if (filteredData.length > 0) {
+                filteredData.forEach(option => {
+                    const resultItem = document.createElement('div');
+                    resultItem.textContent = `${option.name}, ${option.description}`;
+                    resultItem.dataset.id = option[parameter.value];
+                    resultItem.addEventListener('click', function() {
+                        inputElement.value = `${option.name}, ${option.description}`;
+                        inputElement.dataset.id = option[parameter.value];
+                        clearAutocompleteResults(resultsContainer);
+                    });
+                    resultsContainer.appendChild(resultItem);
+                });
+    
+                resultsContainer.style.display = 'block';
+            }
+    
+            // Predictive text highlight
+            if (inputValue.length > 0) {
+                const firstMatch = filteredData[0];
+                if (firstMatch) {
+                    const matchedText = `${firstMatch.name}, ${firstMatch.description}`;
+                    if (matchedText.toLowerCase().startsWith(inputValue)) {
+                        const remainingText = matchedText.slice(inputValue.length);
+                        inputElement.value = inputValue + remainingText;
+                        inputElement.setSelectionRange(inputValue.length, matchedText.length);
+                    }
+                }
+            }
+        }
+    
+        function updateHighlight(results, selectedIndex) {
+            Array.from(results).forEach((result, index) => {
+                if (index === selectedIndex) {
+                    result.classList.add('highlight');
+                } else {
+                    result.classList.remove('highlight');
+                }
+            });
+        }
+    
+        function initializeForm() {
+            const parametersContainer = document.getElementById('parametersContainer');
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+    
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                const formGroup = createFormGroup(key, parameter);
+                parametersContainer.appendChild(formGroup);
+            });
+        }
+    
+        document.addEventListener('DOMContentLoaded', function() {
+    initializeForm();
+
+    document.getElementById('submitButton').addEventListener('click', function() {
+        const parameters = JSON.parse(document.getElementById('parameters').textContent);
+        const messageElement = document.getElementById('submitMessage');
+
+        if (validateParameters(parameters)) {
+            const values = collectParameterValues(parameters);
+
+            // Collect ID values from autocomplete inputs
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                if (parameter.type === 'autocomplete') {
+                    const inputElement = document.getElementById(key);
+                    values[key] = inputElement.dataset.id;
+                }
+            });
+
+            // Submission logic  
+            console.log('Submitting values:', values);
+            messageElement.textContent = 'Form submitted successfully!';
+            messageElement.classList.remove('error-message');
+            messageElement.classList.add('success-message');
+        } else {
+            messageElement.textContent = 'Please fill in all required fields.';
+            messageElement.classList.remove('success-message');
+            messageElement.classList.add('error-message');
+        }
+    });
+});
+
+    </script>
+</body>
+</html>

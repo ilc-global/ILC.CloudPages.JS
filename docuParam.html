@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="Docu Parameter ver.1">
+    <title>Autocomplete Validation</title>
+    <style>
+        .autocomplete-container {
+            position: relative;
+        }
+        .autocomplete-results {
+            border: 1px solid #ddd;
+            max-height: 150px;
+            overflow-y: auto;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #fff;
+        }
+        .autocomplete-results div {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .autocomplete-results div.highlight {
+            background-color: #007BFF;
+            color: #fff;
+        }
+        .selected-item {
+            display: inline-block;
+            margin-right: 5px;
+            padding: 5px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        .remove-item {
+            margin-left: 5px;
+            color: #ff0000;
+            cursor: pointer;
+        }
+        .text-danger {
+            color: red;
+        }
+        .required-asterisk {
+            color: red;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .col-sm-4, .col-sm-8 {
+            flex: 0 0 auto;
+            width: 33.333333%;
+        }
+        .col-sm-8 {
+            width: 66.666667%;
+        }
+    </style>
+</head>
+<body>
+    <div id="parametersContainer"></div>
+    <div id="submitMessage"></div>
+    <button id="submitButton">Submit</button>
+
+    <script id="parameters" type="application/json">
+        {
+            "search_input": {
+                "label": "Search Input",
+                "required": true,
+                "mode": "single",
+                "sql": {
+                    "mo": "SELECT mo.id, mo.num FROM mo WHERE mo.num LIKE '%@input%'",
+                    "pick": "SELECT pick.id, pick.num FROM pick WHERE pick.num LIKE '%@input%'",
+                    "receipt": "SELECT receipt.id, COALESCE(so.num, po.num, xo.num) AS doc FROM receipt LEFT JOIN xo ON xo.id = receipt.xoid LEFT JOIN po ON po.id = receipt.poid LEFT JOIN so ON so.id = receipt.soid WHERE COALESCE(so.num, po.num, xo.num) LIKE '%@input%'",
+                    "ship": "SELECT ship.id, ship.num FROM ship WHERE ship.num LIKE '%@input%'",
+                    "so": "SELECT so.id, so.num FROM so WHERE so.num LIKE '%@input%'",
+                    "xo": "SELECT xo.id, xo.num FROM xo WHERE xo.num LIKE '%@input%'",
+                    "wo": "SELECT wo.id, wo.num FROM wo WHERE wo.num LIKE '%@input%'",
+                    "rma": "SELECT rma.id, rma.num FROM rma WHERE rma.num LIKE '%@input%'",
+                    "po": "SELECT po.id, po.num FROM po WHERE po.num LIKE '%@input%'"
+                },
+                "search": "num, doc",
+                "display": "num, doc",
+                "value": "id"
+            }
+        }
+        </script>
+        
+
+  <script>
+        function validateParameters(parameters) {
+            let isValid = true;
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                const element = document.getElementById(key);
+                const errorElement = document.getElementById(key + '_error');
+                if (element) {
+                    if (!errorElement) {
+                        const newErrorElement = document.createElement('div');
+                        newErrorElement.setAttribute('id', key + '_error');
+                        newErrorElement.className = 'text-danger';
+                        element.parentNode.appendChild(newErrorElement);
+                    } else {
+                        errorElement.textContent = '';
+                    }
+                    if (parameter.required && (!element.value || element.value === 'Select an option')) {
+                        const newErrorElement = document.getElementById(key + '_error');
+                        newErrorElement.textContent = `${parameter.label} is required.`;
+                        isValid = false;
+                    }
+                }
+            });
+            return isValid;
+        }
+
+        function collectParameterValues(parameters) {
+            const values = {};
+            Object.keys(parameters).forEach(key => {
+                const parameter = parameters[key];
+                const element = document.getElementById(key);
+                if (element) {
+                    if (parameter.mode === 'multi') {
+                        const selectedItems = element.parentNode.querySelectorAll('.selected-item');
+                        values[key] = Array.from(selectedItems).map(item => item.getAttribute('data-value'));
+                    } else {
+                        values[key] = element.getAttribute('data-value') || element.value;
+                    }
+                }
+            });
+            return values;
+        }
+
+        function addSelectedItem(key, resultItem, autocompleteInput, resultsContainer, selectedItemsContainer) {
+            const selectedItem = document.createElement('span');
+            selectedItem.className = 'selected-item';
+            selectedItem.textContent = resultItem.textContent;
+            selectedItem.setAttribute('data-value', resultItem.getAttribute('data-value'));
+            const removeItem = document.createElement('span');
+            removeItem.className = 'remove-item';
+            removeItem.textContent = 'x';
+            removeItem.addEventListener('click', function() {
+                selectedItemsContainer.removeChild(selectedItem);
+            });
+            selectedItem.appendChild(removeItem);
+            selectedItemsContainer.appendChild(selectedItem);
+            autocompleteInput.value = '';
+            clearResults(resultsContainer);
+        }
+
+        function createFormGroup(key, parameter) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group row';
+            const labelElement = document.createElement('label');
+            labelElement.className = 'col-sm-4 col-form-label';
+            labelElement.textContent = parameter.label;
+            if (parameter.required) {
+                const asterisk = document.createElement('span');
+                asterisk.textContent = '*';
+                asterisk.className = 'required-asterisk';
+                labelElement.appendChild(asterisk);
+            }
+            formGroup.appendChild(labelElement);
+            const inputContainer = document.createElement('div');
+            inputContainer.className = 'col-sm-8';
+            const inputElement = createAutocomplete(key, parameter);
+            inputContainer.appendChild(inputElement);
+            formGroup.appendChild(inputContainer);
+            return formGroup;
+        }
+
+        function createAutocomplete(key, parameter) {
+            const autocompleteContainer = document.createElement('div');
+            autocompleteContainer.className = 'autocomplete-container';
+            const autocompleteInput = document.createElement('input');
+            autocompleteInput.setAttribute('type', 'text');
+            autocompleteInput.setAttribute('id', key);
+            autocompleteInput.className = 'form-control';
+            autocompleteInput.setAttribute('placeholder', 'Type to search...');
+            autocompleteContainer.appendChild(autocompleteInput);
+            const resultsContainer = document.createElement('div');
+            resultsContainer.className = 'autocomplete-results';
+            autocompleteContainer.appendChild(resultsContainer);
+            autocompleteInput.addEventListener('input', function(event) {
+                const inputValue = this.value.trim().toLowerCase();
+                if (inputValue.length >= 3) {
+                    performAutocompleteSearch(key, parameter, inputValue, resultsContainer, autocompleteInput);
+                } else {
+                    clearResults(resultsContainer);
+                }
+            });
+            autocompleteInput.addEventListener('keydown', function(event) {
+                const results = resultsContainer.children;
+                if (event.key === 'ArrowDown') {
+                    selectedIndex = (selectedIndex + 1) % results.length;
+                    updateResultsHighlight(results);
+                } else if (event.key === 'ArrowUp') {
+                    selectedIndex = (selectedIndex - 1 + results.length) % results.length;
+                    updateResultsHighlight(results);
+                } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (results[selectedIndex]) {
+                        autocompleteInput.value = results[selectedIndex].innerText;
+                        clearResults(resultsContainer);
+                    }
+                }
+            });
+            document.addEventListener('click', function(event) {
+                if (!autocompleteContainer.contains(event.target)) {
+                    clearResults(resultsContainer);
+                }
+            });
+            return autocompleteContainer;
+        }
+
+        function escapeSqlString(value) {
+            return value.replace(/'/g, "''");
+        }
+
+        function performAutocompleteSearch(key, parameter, inputValue, resultsContainer, autocompleteInput) {
+            clearResults(resultsContainer);
+            const queries = Object.values(parameter.sql).map(sql => sql.replace('%@input%', '%' + escapeSqlString(inputValue) + '%'));
+            let results = [];
+            for (let query of queries) {
+                console.log('Executing query:', query); // Log the query being executed
+                const queryResult = JSON.parse(fb_client.runQuery(query));
+                console.log('Query result:', queryResult); // Log the query result
+                results = results.concat(queryResult);
+            }
+            const matchedResults = results.filter(result => {
+                console.log('Processing result:', result); // Log each result object
+                return parameter.search.split(',').some(field => {
+                    const fieldValue = result[field.trim()];
+                    console.log('Field value:', fieldValue); // Log the value of the field
+                    return fieldValue && fieldValue.toString().toLowerCase().includes(inputValue);
+                });
+            });
+            if (matchedResults.length > 0) {
+                resultsContainer.style.display = 'block';
+                matchedResults.forEach(result => {
+                    const resultItem = document.createElement('div');
+                    const displayText = parameter.display.split(',').map(field => result[field.trim()]).join(', ');
+                    const matchStart = displayText.toLowerCase().indexOf(inputValue);
+                    const matchEnd = matchStart + inputValue.length;
+                    resultItem.innerHTML = displayText.substring(0, matchStart) +
+                        '<span class="predictive-text">' +
+                        displayText.substring(matchStart, matchEnd) +
+                        '</span>' +
+                        displayText.substring(matchEnd);
+                    resultItem.setAttribute('data-value', result[parameter.value]);
+                    resultItem.addEventListener('click', function() {
+                        autocompleteInput.value = displayText;
+                        autocompleteInput.setAttribute('data-value', result[parameter.value]);
+                        clearResults(resultsContainer);
+                    });
+                    resultsContainer.appendChild(resultItem);
+                });
+            }
+        }
+
+        function clearResults(resultsContainer) {
+            while (resultsContainer.firstChild) {
+                resultsContainer.removeChild(resultsContainer.firstChild);
+            }
+            resultsContainer.style.display = 'none';
+            selectedIndex = -1;
+        }
+
+        function updateResultsHighlight(results) {
+            for (let i = 0; i < results.length; i++) {
+                results[i].classList.toggle('highlight', i === selectedIndex);
+            }
+        }
+
+        function initForm() {
+            const parameters = JSON.parse(document.getElementById('parameters').textContent);
+            const parametersContainer = document.getElementById('parametersContainer');
+            const formGroup = createFormGroup('search_input', parameters['search_input']);
+            parametersContainer.appendChild(formGroup);
+            const submitButton = document.getElementById('submitButton');
+            const submitMessage = document.getElementById('submitMessage');
+            submitButton.addEventListener('click', function() {
+                submitMessage.textContent = '';
+                const isValid = validateParameters(parameters);
+                if (isValid) {
+                    const parameterValues = collectParameterValues(parameters);
+                    console.log('JSON Object:', parameterValues); // Log to console
+                    // Display success message
+                    submitMessage.textContent = 'Form submitted successfully!';
+                    submitMessage.classList.remove('error-message');
+                    submitMessage.classList.add('success-message');
+                } else {
+                    console.error('Please fill out all required fields.'); // Log error to console
+                    // Display error message
+                    submitMessage.textContent = 'Please fill in all required fields.';
+                    submitMessage.classList.remove('success-message');
+                    submitMessage.classList.add('error-message');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', initForm);
+    </script>
+</body>
+</html>
