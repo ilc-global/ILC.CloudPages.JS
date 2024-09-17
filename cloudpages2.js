@@ -1,10 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
-    
     const parameters = JSON.parse(document.getElementById('parameters').textContent);
-    const settings = JSON.parse(document.getElementById('settings').textContent);
-    const columns = JSON.parse(document.getElementById('columns').textContent);
-    const query = JSON.parse(document.getElementById('query').textContent);
-
+    
     function validateParameters(parameters) {
         let isValid = true;
 
@@ -78,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     inputElement = document.createElement('input');
                     inputElement.setAttribute('type', 'text');
-                  }
+                }
                 break;
             case 'multiline':
                 inputElement = document.createElement('textarea');
@@ -104,7 +100,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     inputElement = document.createElement('input');
                     inputElement.setAttribute('type', 'date');
                 }
-                break;
             case 'time':
                 inputElement = document.createElement('input');
                 inputElement.setAttribute('type', parameter.type);
@@ -171,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
         return values;
     }
-    /*function addSelectedItem(key, resultItem, autocompleteInput, resultsContainer, selectedItemsContainer) {
+    function addSelectedItem(key, resultItem, autocompleteInput, resultsContainer, selectedItemsContainer) {
         const selectedItem = document.createElement('span');
         selectedItem.className = 'selected-item';
         selectedItem.textContent = resultItem.textContent;
@@ -189,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
         autocompleteInput.value = '';
         clearResults(resultsContainer);
-    }*/
+    }
 
     function createFormGroup(key, parameter) {
         const formGroup = document.createElement('div');
@@ -208,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const inputContainer = document.createElement('div');
         inputContainer.className = 'col-sm-8';
-        
+
         const inputElement = createAutocomplete(key, parameter);
         inputContainer.appendChild(inputElement);
 
@@ -394,9 +389,9 @@ document.addEventListener('DOMContentLoaded', function () {
         autocompleteInput.value = '';
         clearResults(resultsContainer);
     }
-    
-    /*function initForm() {
-        generateParameterForm();  // Generates the form dynamically
+
+    function initForm() {
+        generateParameterForm();
         const parametersScript = document.getElementById('parameters');
         const parameters = JSON.parse(parametersScript.textContent);
 
@@ -418,16 +413,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (isValid) {
                 const parameterValues = collectParameterValues(parameters);
                 console.log('JSON Object:', parameterValues); // Log to console
-                 
+
                 // Display success message
                 submitMessage.textContent = 'Form submitted successfully!';
                 submitMessage.classList.remove('error-message');
                 submitMessage.classList.add('success-message');
-    
-                // Call the report preparation function
-                prepare_report(parameterValues);
             } else {
-                console.error('Please fill out all required fields.');
+                console.error('Please fill out all required fields.'); // Log error to console
 
                 // Display error message
                 submitMessage.textContent = 'Please fill in all required fields.';
@@ -435,51 +427,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 submitMessage.classList.add('error-message');
             }
         });
-}
+    }
 
-document.addEventListener('DOMContentLoaded', function() {
-    initForm();  // Ensure all form generation is triggered after DOM is loaded
-});*/
-function initializeForm() {
-    const parametersContainer = document.getElementById('parametersContainer');
-    const parameters = JSON.parse(document.getElementById('parameters').textContent);
-
-    Object.keys(parameters).forEach(key => {
-        const parameter = parameters[key];
-        const formGroup = createFormGroup(key, parameter);
-        parametersContainer.appendChild(formGroup);
-    });
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    initializeForm();
-
-document.getElementById('submitButton').addEventListener('click', function() {
-const parameters = JSON.parse(document.getElementById('parameters').textContent);
-const messageElement = document.getElementById('submitMessage');
-
-if (validateParameters(parameters)) {
-    const values = collectParameterValues(parameters);
-
-    // Collect ID values from autocomplete inputs
-    Object.keys(parameters).forEach(key => {
-        const parameter = parameters[key];
-        if (parameter.type === 'autocomplete') {
-            const inputElement = document.getElementById(key);
-            values[key] = inputElement.dataset.id;
-        }
-    });
-
-    // Submission logic  
-    console.log('Submitting values:', values);
-    messageElement.textContent = 'Form submitted successfully!';
-    messageElement.classList.remove('error-message');
-    messageElement.classList.add('success-message');
-} else {
-    messageElement.textContent = 'Please fill in all required fields.';
-    messageElement.classList.remove('success-message');
-    messageElement.classList.add('error-message');
-}
-});
-});
+    document.addEventListener('DOMContentLoaded', initForm);
+    
 });

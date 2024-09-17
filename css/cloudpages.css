@@ -1,0 +1,71 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+}
+.form-group {
+    margin-bottom: 20px;
+}
+.required-asterisk {
+    color: red;
+    margin-left: 5px;
+}
+.autocomplete-results {
+    position: absolute;
+    border: 1px solid #ddd;
+    max-height: 150px;
+    overflow-y: auto;
+    background: white;
+    width: 100%;
+    z-index: 1000;
+    display: none;
+}
+.autocomplete-results div {
+    padding: 10px;
+    cursor: pointer;
+}
+.autocomplete-results div:hover {
+    background-color: #f0f0f0;
+}
+.autocomplete-results .highlight {
+    background-color: blue;
+    color: white;
+}
+.autocomplete-container {
+    position: relative;
+}
+label {
+    font-weight: bold;
+}
+.predictive-text {
+    color: blue;
+}
+.helper-text {
+    font-size: 0.9em;
+    margin-top: 5px;
+    color: #6c757d;
+    white-space: nowrap;
+    position: absolute;
+    display: inline-block;
+    margin-top: 30px;
+    left: 38px;
+    vertical-align: left;
+}
+.success-message {
+    color: green;
+}
+.error-message {
+    color: red;
+}
+.selected-item {
+    display: inline-block;
+    background-color: #e9ecef;
+    padding: 5px;
+    border-radius: 4px;
+    margin-right: 5px;
+    margin-top: 5px;
+}
+.selected-item .remove-item {
+    margin-left: 10px;
+    cursor: pointer;
+    color: red;
+}

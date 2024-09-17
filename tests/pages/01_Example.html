@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="fb_path" content="TBD:PATH">
     <meta name="fb_modules" content="MODULES">
-    <meta name="fb_title" content="TITLE">    
+    <meta name="fb_title" content="01 Example">    
     <meta name="fb_description" content="DESC">
     <meta name="window_state" content="maximized">
-    <title>Document</title>    
+    <title>Document</title> 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>   
     <!-- ILC Page JS Merged Minified -->
+    <script src="js/cloudpages.js"></script>
     <!-- ILC Page CSS Merged -->
+    <link rel="stylesheet" href="css/cloudpages.css">
 </head>
 <body>
     <div id="title"></div>
@@ -53,7 +56,7 @@ LIMIT 100
 {
     "child_customers" : {
         "type" : "multiselect",
-        "sql" : "select id,name from customer where customer.parentid = 100"
+        "sql" : "select id,name from customer where customer.parentid = 100",
         "value" : "id",
         "display" : "name"
     },
@@ -82,9 +85,9 @@ LIMIT 100
 }
 </script>
 <script> 
-//TODO
-$(document).ready(function(){
-    prepare_report();
-})
-</script>
+    //TODO
+    $(document).ready(function(){
+        prepare_report();
+    })
+    </script>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="fb_title" content="Record Parameter ver.4">
+    <meta name="fb_title" content="Record Parameter ver.5">
     <title>Parameter HTML Generation</title>
     <!-- Bootstrap CSS CDN -->
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
@@ -382,6 +382,7 @@
     </script>
 
     <script>
+        
         function validateParameters(parameters) {
             let isValid = true;
 
@@ -691,6 +692,42 @@ function addSelectedItem(key, resultItem, autocompleteInput, resultsContainer, s
                 }
             });
         }
+        document.addEventListener("DOMContentLoaded", function() {
+    // Function to get a flattened list of node IDs starting from the selected node
+    function getFlattenedNodeList(nodeId, tree) {
+        let result = [nodeId];
+        for (let key in tree) {
+            if (tree[key].parentid === nodeId) {
+                result = result.concat(getFlattenedNodeList(tree[key].id, tree));
+            }
+        }
+        return result;
+    }
+
+    // Event handler for dropdown selection
+    document.getElementById("producttreeDropdown").addEventListener("change", function() {
+        const selectedNodeId = this.value;
+        const flattenedNodeList = getFlattenedNodeList(selectedNodeId, productTree);  // Assuming `productTree` holds your tree data
+        const flattenedListString = flattenedNodeList.join("-");
+
+        // Update the output (modify as needed to match your implementation)
+        document.getElementById("output").textContent = `Flattened List: ${flattenedListString}`;
+    });
+
+    // Populate dropdown dynamically (modify as needed to match your implementation)
+    function populateDropdown(tree) {
+        const dropdown = document.getElementById("producttreeDropdown");
+        for (let key in tree) {
+            let option = document.createElement("option");
+            option.value = tree[key].id;
+            option.text = tree[key].name;
+            dropdown.appendChild(option);
+        }
+    }
+
+    // Initialize dropdown with your existing data structure (modify as needed)
+    populateDropdown(productTree);  // `productTree` should be your tree data structure
+});
 
         document.addEventListener('DOMContentLoaded', initForm);
     </script>
