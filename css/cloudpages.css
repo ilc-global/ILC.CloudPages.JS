@@ -1,14 +1,112 @@
 body {
     font-family: Arial, sans-serif;
     padding: 20px;
+    background-color: #f8f9fa;
 }
-.form-group {
+
+#parametersContainer {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
     margin-bottom: 20px;
 }
+
+.form-group {
+    margin-bottom: 15px;
+    overflow: visible;
+}
+
+.form-group label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
+    color: #343a40;
+}
+
+.form-group input, 
+.form-group select, 
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+    color: #495057;
+}
+
+.form-group input[type="date"] {
+    width: calc(50% - 10px);
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.form-group input:focus, 
+.form-group select:focus, 
+.form-group textarea:focus {
+    border-color: #80bdff;
+    outline: none;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.25);
+}
+select.form-control {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    margin: 0;
+    z-index: 10;
+}
+select[multiple].form-control {
+    height: auto;
+    min-height: 50px;
+}
+#submitButton {
+    padding: 10px 15px;
+    font-size: 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100px;
+    margin-top: 20px;
+}
+
+#submitButton:hover {
+    background-color: #0056b3;
+}
+
 .required-asterisk {
     color: red;
     margin-left: 5px;
 }
+
+.helper-text {
+    font-size: 0.9em;
+    margin-top: 5px;
+    color: #6c757d;
+}
+
+.date-inputs {
+    display: flex;
+    align-items: center;
+}
+
+.date-inputs input {
+    width: 48%;
+}
+
+.date-range-group {
+    display: flex;
+    gap: 10px; /* Adds space between start and end date inputs */
+    align-items: center;
+}
+
+.date-range-group input {
+    width: calc(50% - 10px); /* Ensures both inputs stay on the same line */
+}
+
 .autocomplete-results {
     position: absolute;
     border: 1px solid #ddd;
@@ -19,43 +117,21 @@ body {
     z-index: 1000;
     display: none;
 }
+
 .autocomplete-results div {
     padding: 10px;
     cursor: pointer;
 }
+
+.autocomplete-highlight {
+    color: blue;
+    font-weight: bold;
+}
+
 .autocomplete-results div:hover {
     background-color: #f0f0f0;
 }
-.autocomplete-results .highlight {
-    background-color: blue;
-    color: white;
-}
-.autocomplete-container {
-    position: relative;
-}
-label {
-    font-weight: bold;
-}
-.predictive-text {
-    color: blue;
-}
-.helper-text {
-    font-size: 0.9em;
-    margin-top: 5px;
-    color: #6c757d;
-    white-space: nowrap;
-    position: absolute;
-    display: inline-block;
-    margin-top: 30px;
-    left: 38px;
-    vertical-align: left;
-}
-.success-message {
-    color: green;
-}
-.error-message {
-    color: red;
-}
+
 .selected-item {
     display: inline-block;
     background-color: #e9ecef;
@@ -64,8 +140,14 @@ label {
     margin-right: 5px;
     margin-top: 5px;
 }
+
 .selected-item .remove-item {
     margin-left: 10px;
     cursor: pointer;
     color: red;
+}
+
+#footer {
+    margin-top: 40px;
+    text-align: center;
 }

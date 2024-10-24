@@ -64,7 +64,7 @@ function createFormGroup(key, parameter, uniqueSuffix) {
     errorElement.setAttribute('id', uniqueId + '_error');
     formGroup.appendChild(errorElement);
 
-    return formGroup;
+    return {formGroup, uniqueId };;
 }
 
 function createRangeInput(key, parameter, uniqueSuffix) {
@@ -122,46 +122,85 @@ function createComboBox(key, parameter, uniqueSuffix) {
 
     return selectElement;
 }
+// Handle Submit 
+function handleSubmit(parameters) {
+    // Collect form input values
+    const formData = {};
+    Object.keys(parameters).forEach(key => {
+        const parameter = parameters[key];
+        const uniqueId = uniqueIds[key]; // Retrieve the stored unique ID
 
-// Other functions remain the same, adding the uniqueSuffix argument where necessary
+        let value;
+        if (parameter.type === 'date' && parameter.mode === 'range') {
+            const startValue = document.getElementById(uniqueId + '_start').value;
+            const endValue = document.getElementById(uniqueId + '_end').value;
+            value = { start: startValue, end: endValue };
+        } else {
+            const element = document.getElementById(uniqueId);
+            if (element) {
+                if (parameter.type === 'combobox' && parameter.mode === 'multi') {
+                    // Get selected options for multi-select
+                    value = Array.from(element.selectedOptions).map(option => option.value);
+                } else {
+                    value = element.value;
+                }
+            }
+        }
+        formData[key] = value;
+    })};
 
 // Form initialization
 function initForm() {
-    const parametersElement = document.getElementById('parameter'); //changed
-    
-    if (!parametersElement) {
-        console.error('Parameters element not found');
-        return;
-    }
+    const parametersElement = document.getElementById('parameters');
+    const settingsElement = document.getElementById('settings');
+    const queryElement = document.getElementById('query');
 
-    const parametersText = parametersElement.textContent.trim();
-    if (!parametersText) {
-        console.error('Parameters script element is empty');
-        return;
-    }
-
-    console.log('Parameters Text:', parametersText);
-
+    // Parse parameters
     let parameters;
     try {
+        const parametersText = parametersElement.textContent.trim();
         parameters = JSON.parse(parametersText);
-        console.log('Parsed Parameters:', parameters);
     } catch (error) {
-        console.error('Error parsing JSON:', error);
+        console.error('Error parsing parameters JSON:', error);
+        return;
+    }
+
+    // Parse settings
+    let settings;
+    try {
+        const settingsText = settingsElement.textContent.trim();
+        settings = JSON.parse(settingsText);
+    } catch (error) {
+        console.error('Error parsing settings JSON:', error);
+        return;
+    }
+
+    // Get query text
+    const queryText = queryElement.textContent.trim();
+
+    // Parse parameter data from the "parameter" element
+    let parametersData;
+    try {
+        parametersData = JSON.parse(document.getElementById("parameters").textContent);
+    } catch (error) {
+        console.error('Error parsing parameter data:', error);
         return;
     }
 
     const parametersContainer = document.getElementById('parametersContainer');
-    
+    const uniqueIds = {};
+
     Object.keys(parameters).forEach((key, index) => {
-        const uniqueSuffix = index + '_' + Math.random().toString(36).substring(7);  // Create a unique suffix for each form element
-        const formGroup = createFormGroup(key, parameters[key], uniqueSuffix);
+        const uniqueSuffix = index + '_' + Math.random().toString(36).substring(7);
+        const { formGroup, uniqueId } = createFormGroup(key, parameters[key], uniqueSuffix);
         parametersContainer.appendChild(formGroup);
+        uniqueIds[key] = uniqueId;
     });
 
     document.getElementById('submitButton').addEventListener('click', function () {
-        handleSubmit(parameters);
+        handleSubmit(parameters, uniqueIds, queryText, settings);
     });
 }
 
 document.addEventListener('DOMContentLoaded', initForm);
+

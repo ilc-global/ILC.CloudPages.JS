@@ -9,20 +9,29 @@
     <meta name="fb_description" content="DESC">
     <meta name="window_state" content="maximized">
     <title>Document</title> 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>   
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>   
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.2/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script> 
     <!-- ILC Page JS Merged Minified -->
-    <script src="cloudpagesTest2.js"></script>
+    <script src="cloudpagesTest5.js"></script>
     <!-- ILC Page CSS Merged -->
     <link rel="stylesheet" href="css/cloudpages.css">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+     
 </head>
 <body>
     <div id="parametersContainer" class="container"></div>
+    <div id="tableContainer"></div>
     <button id="submitButton" class="btn btn-primary">Run</button>
+    <button id="renderTableButton">Render Table</button>
+    <button id="exportBtn">Export to Excel</button>
     <div id="submitMessage"></div>
-
+   
     <div id="title"></div>
     <div id="parameters-data"></div>
     <div id="results"></div>
+    <div id="results-table-container"></div> 
     <div id="footer"></div>
 </body>
 <script id="settings" type="application/json">
@@ -53,17 +62,27 @@
     LIMIT 100
     </script>
     
-    <script id="parameter" type="application/json">
+    <script id="parameters" type="application/json">
     {
         "child_customers": {
-            "type": "multiselect",
-            "sql": "select id, name from customer where customer.parentid = 100",
-            "value": "id",
-            "display": "name"
+            "label": "Customer Node",
+            "type": "autocomplete",
+            "sql" : "select id,name,description from inventorylogtype",
+            "value": "description",
+            "display": "name,description",
+            "minChars" : 0,
+            "search": "name",
+            "required": "true"
         },
         "customer": {
-            "type": "customer",
-            "mode": "single",
+            "label": "Customer",
+            "type": "dropdown",
+            "sql": "select id,name,description from inventorylogtype",
+            "mode": "multi",
+            "value": "description",
+            "display" : "num,description",
+            "search" : "num",
+            "minChars" : 0,
             "default": "%"
         },
         "date_issued": {
@@ -76,35 +95,21 @@
     }
     </script>
     
-
-<!-- Script to initialize the report and handle form submission 
-<script> 
-    $(document).ready(function(){
-        // Function to initialize the report preparation and form rendering
-        prepare_report();
-    });
-
-    // Example of how to integrate the prepare_report function (should be part of your JS logic)
-    function prepare_report() {
-        const parameters = JSON.parse(document.getElementById('parameters').textContent);
-        const parametersContainer = document.getElementById('parametersContainer');
-
-        Object.keys(parameters).forEach(key => {
-            const parameter = parameters[key];
-            const formGroup = createFormGroup(key, parameter);  // Using the JS createFormGroup function
-            parametersContainer.appendChild(formGroup);
-        });
-
-        document.getElementById('submitButton').addEventListener('click', function () {
-            handleSubmit(parameters);
-        });
-    }
-    </script> -->
-
+    <script id="columns" type="application/json">
+        {
+            "so_total_tax" : {
+                "format" : "currency"
+            },
+            "so_date_issued" : {
+                "format" : "date"
+            }
+        }
+        </script>
     <script>
         // Initialize form on page load
         document.addEventListener("DOMContentLoaded", function() {
-            initForm(); // This calls the initForm function in cloudpagesTest.js to render fields
+            //initForm(); // This calls the initForm function in cloudpagesTest.js to render fields
         });
+
     </script>
 </html>
