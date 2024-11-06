@@ -332,38 +332,7 @@ function createAutocomplete(key, parameter) {
                 performAutocompleteSearch(key, parameter, inputValue, results_obj, resultsContainer, autocompleteInput);
             });
         }
-    /*if (inputValue.length >= parameter.minChars) {
-        try {
-            // Modify SQL and execute it using fb_client
-            const query = parameter.sql.replace('@input', inputValue);
-            console.log(`Executing Query: ${query}`);  // Debugging query
-            const results = fb_client.runQuery(query);  // Execute the SQL query
 
-            const resultsObj = JSON.parse(results);
-            console.log(`Query Results: ${resultsObj}`);  // Debugging query results
-
-            // Clear previous results
-            resultsContainer.innerHTML = '';
-
-            // Render results
-            resultsObj.forEach(result => {
-                const resultItem = document.createElement('div');
-                resultItem.textContent = `${result[parameter.displayField]} - ${result[parameter.valueField]}`;
-                resultItem.className = 'result-item';
-                resultsContainer.appendChild(resultItem);
-
-                // Optional: Add event listener to handle selecting a result
-                resultItem.addEventListener('click', () => {
-                    autocompleteInput.value = result[parameter.displayField];
-                    autocompleteInput.dataset.id = result[parameter.valueField];  // Store the selected ID
-                    resultsContainer.innerHTML = '';  // Clear results after selection
-                });
-            });
-            renderTable(resultsObj, 'results-table-container');  // Specify the table container's ID
-        } catch (error) {
-            console.error(`Error executing query: ${error.message}`);
-        }
-    }*/
 });
 
 autocompleteInput.addEventListener('keydown', function(event) {
@@ -556,11 +525,28 @@ function clearAutocompleteResults(resultsContainer) {
     }
     resultsContainer.style.display = 'none';
 }
+function formatKeyToTitle(key) {
+    return key
+        .replace(/_/g, ' ')           // Replace underscores with spaces
+        .replace(/\b\w/g, c => c.toUpperCase()); // Capitalize each word
+}
+function formatAmount(value, format) {
+    // Placeholder function for formatting based on settings
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: format === "$0.00" ? 2 : 4
+    }).format(value);
+}
 function renderTable(data, containerId) {
     const container = document.getElementById(containerId);
-    container.innerHTML = '';  // Clear any previous table data
+    container.innerHTML = ''; // Clear any previous table data
 
-    if (data.length === 0) {
+    // Load settings
+    const settings = JSON.parse(document.getElementById('settings').textContent);
+
+    // Handle empty data case
+    if (Object.keys(data).length === 0) {
         const noDataMessage = document.createElement('p');
         noDataMessage.textContent = 'No data available';
         container.appendChild(noDataMessage);
@@ -568,35 +554,60 @@ function renderTable(data, containerId) {
     }
 
     const table = document.createElement('table');
-    table.className = 'table table-striped'; // Add any Bootstrap or custom classes for styling
+    table.className = 'table table-striped';
 
     // Create table header
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    const headers = Object.keys(data[0]); // Use the keys from the first object to create headers
-    headers.forEach(header => {
+    Object.keys(data).forEach(key => {
         const th = document.createElement('th');
-        th.textContent = header;
+        th.textContent = formatKeyToTitle(key); // Use formatted title
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // Create table body
+    // Populate table body with data
     const tbody = document.createElement('tbody');
-    data.forEach(row => {
-        const tableRow = document.createElement('tr');
-        headers.forEach(header => {
-            const td = document.createElement('td');
-            td.textContent = row[header]; // Insert each cell value based on the header
-            tableRow.appendChild(td);
-        });
-        tbody.appendChild(tableRow);
+    const tableRow = document.createElement('tr');
+    Object.entries(data).forEach(([key, value]) => { // Use Object.entries to get both key and value
+        const td = document.createElement('td');
+
+        // Format amounts
+        if (key.includes("amount") && settings.amount_unit_format) {
+            value = formatAmount(value, settings.amount_unit_format);
+        }
+
+        // Format quantities
+        if (key.includes("qty") && settings.qty_unit_format) {
+            const decimalPlaces = settings.qty_unit_format.split('#').length - 1;
+            value = parseFloat(value).toFixed(decimalPlaces);
+        }
+
+        td.textContent = value || 'N/A'; // Display 'N/A' for empty fields
+        tableRow.appendChild(td);
     });
+    tbody.appendChild(tableRow);
     table.appendChild(tbody);
 
-    container.appendChild(table);  // Append the table to the container
+    container.appendChild(table); // Append the table to the container
 }
+
+// Helper function to format amounts based on settings
+function formatAmount(value, format) {
+    const decimalPlaces = format.split('#').length - 1;
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: decimalPlaces
+    }).format(value);
+}
+
+// Helper function to format keys to titles
+function formatKeyToTitle(key) {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+}
+
 
 function handleSubmit(parameters) {
     if (!validateParameters(parameters)) {
@@ -604,75 +615,93 @@ function handleSubmit(parameters) {
         return;
     }
 
-    const formData = {};
-    const orderedFormData = {};
+    const formData = collectParameterValues(parameters);  // Collect the user inputs
+    console.log('Form Data:', formData);
 
     document.getElementById('exportBtn').addEventListener('click', function() {
-    exportTableToExcel('tableContainer', 'ExportedTable');
-});
+        exportTableToExcel('tableContainer', 'ExportedTable');
+    });
 
-function exportTableToExcel(tableId, filename = '') {
-    // Select the table
-    let table = document.querySelector(`#${tableId} table`);
-    
-    if (!table) {
-        alert('No table to export!');
-        return;
+    function exportTableToExcel(tableId, filename = '') {
+        let table = document.querySelector(`#${tableId} table`);
+        if (!table) {
+            alert('No table to export!');
+            return;
+        }
+
+        let workbook = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
+        XLSX.writeFile(workbook, `${filename}.xlsx`);
     }
 
-    // Convert table to worksheet
-    let workbook = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
-    
-    // Export to Excel
-    XLSX.writeFile(workbook, `${filename}.xlsx`);
-}
+    // Collect form data
+    Object.keys(parameters).forEach(key => {
+        const parameter = parameters[key];
+        if (parameter.type === 'checkbox' && parameter.mode === 'multi') {
+            const value = Array.from(document.querySelectorAll(`input[name=${key}]:checked`)).map(cb => cb.value);
+            formData[key] = value.join(',');
+        } else if (parameter.type === 'checkbox' && parameter.mode === 'single') {
+            const selectedCheckbox = document.querySelector(`input[name=${key}]:checked`);
+            formData[key] = selectedCheckbox ? selectedCheckbox.value : null;
+        } else if (parameter.type === 'dropdown' && parameter.mode === 'multi') {
+            const value = Array.from(document.getElementById(key).selectedOptions).map(option => option.value);
+            formData[key] = value.join(',');
+        } else if (parameter.type === 'dropdown' && parameter.mode === 'single') {
+            formData[key] = document.getElementById(key).value;
+        } else if (parameter.type === 'date' && parameter.mode === 'range') {
+            formData[key + '_start'] = document.getElementById(key + '_start').value;
+            formData[key + '_end'] = document.getElementById(key + '_end').value;
+        } else {
+            formData[key] = document.getElementById(key).value;
+        }
+    });
 
-// Collect form data
+    // Order formData to ensure _start fields come before _end fields
+    const orderedFormData = {};
+    Object.keys(formData).sort((a, b) => {
+        if (a.endsWith('_start') && b.endsWith('_end')) return -1;
+        if (a.endsWith('_end') && b.endsWith('_start')) return 1;
+        return a.localeCompare(b);
+    }).forEach(key => {
+        orderedFormData[key] = formData[key];
+    });
+
+    console.log('Form Data:', orderedFormData);
+    document.getElementById('submitMessage').textContent = 'Form submitted successfully!';
+
+// Loop through parameters to find the SQL query
+let sqlQuery;
 Object.keys(parameters).forEach(key => {
-    const parameter = parameters[key];
-
-    if (parameter.type === 'checkbox' && parameter.mode === 'multi') {
-        const value = Array.from(document.querySelectorAll(`input[name=${key}]:checked`)).map(cb => cb.value);
-        formData[key] = value.join(','); // Join values into a comma-separated string
-    } else if (parameter.type === 'checkbox' && parameter.mode === 'single') {
-        const selectedCheckbox = document.querySelector(`input[name=${key}]:checked`);
-        formData[key] = selectedCheckbox ? selectedCheckbox.value : null;
-    } else if (parameter.type === 'dropdown' && parameter.mode === 'multi') {
-        const value = Array.from(document.getElementById(key).selectedOptions).map(option => option.value);
-        formData[key] = value.join(','); // Join values into a comma-separated string
-    } else if (parameter.type === 'dropdown' && parameter.mode === 'single') {
-        formData[key] = document.getElementById(key).value;
-    } else if (parameter.type === 'date' && parameter.mode === 'range') {
-        formData[key + '_start'] = document.getElementById(key + '_start').value;
-        formData[key + '_end'] = document.getElementById(key + '_end').value;
-    } else if (parameter.type === 'time' && parameter.mode === 'range') {
-        formData[key + '_start'] = document.getElementById(key + '_start').value;
-        formData[key + '_end'] = document.getElementById(key + '_end').value;
-    } else if (parameter.type === 'timestamp' && parameter.mode === 'range') {
-        formData[key + '_start'] = document.getElementById(key + '_start').value;
-        formData[key + '_end'] = document.getElementById(key + '_end').value;
-    } else if ((parameter.type === 'int' || parameter.type === 'pct' || parameter.type === 'amt') && parameter.mode === 'range') {
-        formData[key + '_start'] = document.getElementById(key + '_start').value;
-        formData[key + '_end'] = document.getElementById(key + '_end').value;
-    } else {
-        formData[key] = document.getElementById(key).value;
+    if (parameters[key].sql) {
+        sqlQuery = parameters[key].sql;
     }
 });
 
-// Order formData to ensure _start fields come before _end fields
-Object.keys(formData).sort((a, b) => {
-    // Custom sorting logic to ensure _start keys come before _end keys
-    if (a.endsWith('_start') && b.endsWith('_end')) return -1;
-    if (a.endsWith('_end') && b.endsWith('_start')) return 1;
-    return a.localeCompare(b); // Default alphanumeric sorting for other keys
-}) 
-    .forEach(key => {
-    orderedFormData[key] = formData[key];
-});
+if (sqlQuery) {
+    var results = fb_client.runQuery(sqlQuery);
+    var results_obj = JSON.parse(results);
 
-console.log('Form Data:', orderedFormData);
-document.getElementById('submitMessage').textContent = 'Form submitted successfully!';
+    // Filter results based on orderedFormData values
+    const filteredResults = results_obj.filter(item => {
+        return Object.keys(orderedFormData).every(key => {
+            if (!orderedFormData[key]) return true; // Skip if no input for this field
+            if (key.endsWith('_start') || key.endsWith('_end')) {
+                // Handle range filtering for date or number
+                const baseKey = key.replace(/_start|_end/, '');
+                if (key.endsWith('_start') && item[baseKey] < orderedFormData[key]) return false;
+                if (key.endsWith('_end') && item[baseKey] > orderedFormData[key]) return false;
+                return true;
+            }
+            return item[key] === orderedFormData[key]; // Exact match for other fields
+        });
+    });
+
+    // Render filtered data to the table
+    renderTable(formData, 'tableContainer');
+} else {
+    console.log("No SQL query found in parameters.");
 }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const parameters = JSON.parse(document.getElementById('parameters').textContent);
     const columns = JSON.parse(document.getElementById('columns').textContent);  // Load columns JSON
@@ -688,24 +717,5 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('submitButton').addEventListener('click', function () {
         handleSubmit(parameters);
     });
-
- document.getElementById('renderTableButton').addEventListener('click', function() {
-    // Loop through the parameters to find the SQL query dynamically
-    Object.keys(parameters).forEach(key => {
-        const parameter = parameters[key];
-
-        if (parameter.sql) {  // If there's a SQL query present in this parameter
-            var sqlQuery = parameter.sql;
-
-            // Execute the SQL query
-            var results = fb_client.runQuery(sqlQuery);
-            var results_obj = JSON.parse(results);
-
-            // Render all data to the table
-            renderTable(results_obj, 'tableContainer');
-        }
-    });
-});
-
 
 });
