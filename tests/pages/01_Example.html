@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="fb_path" content="TBD:PATH">
     <meta name="fb_modules" content="MODULES">
-    <meta name="fb_title" content="01Example">    
+    <meta name="fb_title" content="01ExampleTest">    
     <meta name="fb_description" content="DESC">
     <meta name="window_state" content="maximized">
-    <title>01 Example</title> 
+    <title>Document</title> 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>   
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.2/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>   
     <!-- ILC Page JS Merged Minified -->
-    <script src="cloudpages.js"></script>
+    <script src="js/cloudpages.js"></script>
     <!-- ILC Page CSS Merged -->
     <link rel="stylesheet" href="css/cloudpages.css">
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
@@ -22,13 +22,13 @@
 </head>
 <body>
     <div id="parametersContainer" class="container"></div>
-    <div id="tableContainer"></div>
     <button id="submitButton" class="btn btn-primary">Run</button>
-    <button id="exportBtn">Export to Excel</button>
+    <button id="exportBtn" class="btn btn-secondary">Export</button>
     <div id="submitMessage"></div>
    
     <div id="title"></div>
     <div id="parameters-data"></div>
+    <div id="tableContainer"></div>
     <div id="results"></div>
     <div id="results-table-container"></div> 
     <div id="footer"></div>
@@ -75,11 +75,11 @@
         "customer": {
             "label": "Customer",
             "type": "dropdown",
-            "sql": "select id,name,description from inventorylogtype",
-            "mode": "multi",
-            "value": "description",
-            "display" : "num,description",
-            "search" : "num",
+            "sql": "SELECT so.num AS so_num, so.totalprice AS so_totalprice, so.totaltax AS so_totaltax, customer.name AS customer_name FROM so JOIN customer ON customer.id = so.customerid LIMIT 50",
+            "mode": "single",
+            "value": "so_num",
+            "display" : "customer_name,so_totalprice,so_totaltax",
+            "search" : "customer_name",
             "minChars" : 0,
             "default": "%"
         },
@@ -104,9 +104,7 @@
         }
         </script>
     <script>
-        // Initialize form on page load
         document.addEventListener("DOMContentLoaded", function() {
-            //initForm(); // This calls the initForm function in cloudpagesTest.js to render fields
         });
 
     </script>
