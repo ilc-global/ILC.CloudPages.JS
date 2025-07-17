@@ -36,7 +36,7 @@
     $(document).ready(function(){
         $("#execute").click(function (e){
             // Retrieve SQL query from external file
-            var sql_query = fb_client.getResourceFileString("03_Query.sql");
+            var sql_query = fb_client.getResourceFileString("../sql/03_Query.sql");
             console.log(sql_query);
             
             // Run the query and parse results

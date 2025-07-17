@@ -34,7 +34,7 @@
 <script>
     $(document).ready(function(){ // ensures JS will run when DOM (doc object model) is fully loaded and ready
         $("#execute").click(function (e){ // attaches a click event handler to element with ID "execute", when clicked, the function "click ()" will be executed
-            var sql_query = fb_client.getResourceFileString("sql/03_Query.sql"); // retrieves the contest of SQL query from file name sql/file_name
+            var sql_query = fb_client.getResourceFileString("../sql/03_Query.sql"); // retrieves the contest of SQL query from file name sql/file_name
             console.log(sql_query); // logs retrieved query content to the browser console for debugging 
             var results = fb_client.runQuery(sql_query); // executes the sql query
             var results_obj = JSON.parse(results); // parses results of query, then stores in "results_obj"
