@@ -167,6 +167,15 @@ CloudPages.registerRenderer('color', {
 | SheetJS (XLSX) | For export | XLSX file generation |
 | Bootstrap 5 | Recommended | Form styling (`form-control`, `form-select`, `form-label`) |
 
+## Documentation
+
+- **[Getting Started](docs/getting-started.md)** — Build your first CloudPage report step by step
+- **[Parameter Types](docs/parameter-types.md)** — All 9 parameter types with config examples
+- **[Column Formatting](docs/column-formatting.md)** — Currency, date, number, percent formatting and custom labels
+- **[Hooks & Customization](docs/hooks-and-customization.md)** — Lifecycle hooks, custom renderers, public API
+- **[SQL Patterns](docs/sql-patterns.md)** — Common Fishbowl queries for sales, purchasing, inventory, shipping
+- **[Examples](docs/examples.md)** — Complete, copy-paste report pages
+
 ## Project Structure
 
 ```
@@ -176,10 +185,17 @@ ILC.CloudPages.JS/
 ├── CONTRIBUTING.md
 ├── SECURITY.md
 ├── js/
-│   ├── cloudpages.js          # Declarative report engine
-│   └── fb.js                  # Cross-platform client library (from ILC.Fishbowl.JS)
+│   ├── cloudpages.js              # Declarative report engine
+│   └── fb.js                      # Cross-platform client library (from ILC.Fishbowl.JS)
 ├── css/
-│   └── cloudpages.css         # Parameter layout, autocomplete, range inputs
+│   └── cloudpages.css             # Parameter layout, autocomplete, range inputs
+├── docs/
+│   ├── getting-started.md         # Step-by-step first page guide
+│   ├── parameter-types.md         # All 9 parameter types reference
+│   ├── column-formatting.md       # Column display and formatting
+│   ├── hooks-and-customization.md # Hooks, custom renderers, public API
+│   ├── sql-patterns.md            # Fishbowl SQL cookbook
+│   └── examples.md                # Complete example pages
 └── tests/
     ├── cloudpages-cdp-tests.js    # CDP test runner (69 tests, 5 tiers)
     └── pages/
