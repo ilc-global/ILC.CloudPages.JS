@@ -1,170 +1,79 @@
-body {
-    font-family: Arial, sans-serif;
-    padding: 20px;
-    background-color: #f8f9fa;
-}
+/* cloudpages.css — ILC CloudPages Report Engine Styles */
 
-#exportBtn {
-    padding: 10px 15px;
-    font-size: 16px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    width: 150px;
-    margin-top: 20px;
-    vertical-align: middle; /* Ensures vertical alignment */
-}
-
-#exportBtn:hover {
-    background-color: #0056b3;
-}
-
+/* Parameters container */
 #parametersContainer {
-    background-color: white;
+    background-color: #fff;
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #ddd;
-    margin-bottom: 20px;
+    border: 1px solid #dee2e6;
 }
 
-.form-group {
-    margin-bottom: 15px;
-    overflow: visible;
+/* Required asterisk */
+.cp-required {
+    color: #dc3545;
 }
 
-.form-group label {
-    font-weight: bold;
-    margin-bottom: 5px;
-    display: block;
-    color: #343a40;
+/* Range inputs */
+.cp-range-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-.form-group input, 
-.form-group select, 
-.form-group textarea {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    box-sizing: border-box;
-    font-size: 14px;
-    color: #495057;
+.cp-range-group .form-control {
+    flex: 1;
 }
 
-.form-group input[type="date"] {
-    width: calc(50% - 10px);
-    display: inline-block;
-    margin-right: 10px;
-}
-
-.form-group input:focus, 
-.form-group select:focus, 
-.form-group textarea:focus {
-    border-color: #80bdff;
-    outline: none;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.25);
-}
-select.form-control {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    padding: 8px;
-    margin: 0;
-    z-index: 10;
-}
-select[multiple].form-control {
-    height: auto;
-    min-height: 50px;
-}
-#submitButton {
-    padding: 10px 15px;
-    font-size: 16px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    width: 100px;
-    margin-top: 20px;
-}
-
-#submitButton:hover {
-    background-color: #0056b3;
-}
-
-.required-asterisk {
-    color: red;
-    margin-left: 5px;
-}
-
-.helper-text {
-    font-size: 0.9em;
-    margin-top: 5px;
+.cp-range-divider {
     color: #6c757d;
+    font-size: 0.875rem;
+    white-space: nowrap;
 }
 
-.date-inputs {
-    display: flex;
-    align-items: center;
+/* Autocomplete */
+.cp-autocomplete-container {
+    position: relative;
 }
 
-.date-inputs input {
-    width: 48%;
-}
-
-.date-range-group {
-    display: flex;
-    gap: 10px; /* Adds space between start and end date inputs */
-    align-items: center;
-}
-
-.date-range-group input {
-    width: calc(50% - 10px); /* Ensures both inputs stay on the same line */
-}
-
-.autocomplete-results {
+.cp-autocomplete-results {
     position: absolute;
-    border: 1px solid #ddd;
-    max-height: 150px;
+    top: 100%;
+    left: 0;
+    right: 0;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    max-height: 200px;
     overflow-y: auto;
-    background: white;
-    width: 100%;
-    z-index: 1000;
+    background: #fff;
+    z-index: 1050;
     display: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.autocomplete-results div {
-    padding: 10px;
+.cp-autocomplete-item {
+    padding: 8px 12px;
     cursor: pointer;
+    font-size: 0.875rem;
 }
 
-.autocomplete-highlight {
-    color: blue;
-    font-weight: bold;
-}
-
-.autocomplete-results div:hover {
-    background-color: #f0f0f0;
-}
-
-.selected-item {
-    display: inline-block;
+.cp-autocomplete-item:hover,
+.cp-autocomplete-highlight {
     background-color: #e9ecef;
-    padding: 5px;
-    border-radius: 4px;
-    margin-right: 5px;
-    margin-top: 5px;
 }
 
-.selected-item .remove-item {
-    margin-left: 10px;
-    cursor: pointer;
-    color: red;
+.cp-autocomplete-no-results {
+    padding: 8px 12px;
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-style: italic;
 }
 
-#footer {
-    margin-top: 40px;
-    text-align: center;
+/* Table container */
+#tableContainer {
+    margin-top: 1rem;
+}
+
+#tableContainer .table {
+    width: 100% !important;
 }

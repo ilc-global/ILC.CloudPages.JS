@@ -1,0 +1,40 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'js/cloudpages.js'
+      - 'css/cloudpages.css'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate version
+        id: version
+        run: |
+          DATE_VER=$(date -u +'%Y.%m.%d')
+          echo "version=${DATE_VER}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build zip
+        run: |
+          mkdir -p dist
+          cp js/cloudpages.js dist/
+          cp css/cloudpages.css dist/
+          cp LICENSE dist/
+          cd dist && zip ../ILC.CloudPages.JS-v${{ steps.version.outputs.version }}.zip cloudpages.js cloudpages.css LICENSE
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: ILC.CloudPages.JS-v${{ steps.version.outputs.version }}.zip
+          generate_release_notes: true
