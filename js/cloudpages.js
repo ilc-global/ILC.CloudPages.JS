@@ -528,19 +528,52 @@
     // the from/to inputs; editing either input switches back to Custom.
     // Weeks start on Sunday, matching Fishbowl.
 
-    var DATE_PRESETS = [
-        { key: 'custom', label: 'Custom' },
-        { key: 'today', label: 'Today' },
-        { key: 'yesterday', label: 'Yesterday' },
-        { key: 'this_week', label: 'This Week' },
-        { key: 'last_week', label: 'Last Week' },
-        { key: 'this_month', label: 'This Month' },
-        { key: 'last_month', label: 'Last Month' },
-        { key: 'last_30', label: 'Last 30 Days' },
-        { key: 'last_90', label: 'Last 90 Days' },
-        { key: 'this_year', label: 'This Year' },
-        { key: 'last_year', label: 'Last Year' },
-        { key: 'ytd', label: 'Year to Date' }
+    // Preset list matches Fishbowl's UtilDateRange (2025.11) plus the
+    // composable last_n/next_n entries. Grouped for the <optgroup> UI.
+    var DATE_PRESET_GROUPS = [
+        { label: '', items: [
+            { key: 'custom', label: 'Custom' },
+            { key: 'all', label: 'All' },
+            { key: 'today', label: 'Today' },
+            { key: 'yesterday', label: 'Yesterday' }
+        ] },
+        { label: 'Weeks', items: [
+            { key: 'this_week', label: 'This Week' },
+            { key: 'this_week_td', label: 'This Week-to-date' },
+            { key: 'last_week', label: 'Last Week' },
+            { key: 'last_week_td', label: 'Last Week-to-date' },
+            { key: 'next_week', label: 'Next Week' },
+            { key: 'next_4_weeks', label: 'Next 4 Weeks' }
+        ] },
+        { label: 'Months', items: [
+            { key: 'this_month', label: 'This Month' },
+            { key: 'this_month_td', label: 'This Month-to-date' },
+            { key: 'last_month', label: 'Last Month' },
+            { key: 'last_month_td', label: 'Last Month-to-date' },
+            { key: 'next_month', label: 'Next Month' }
+        ] },
+        { label: 'Quarters', items: [
+            { key: 'this_quarter', label: 'This Quarter' },
+            { key: 'this_quarter_td', label: 'This Quarter-to-date' },
+            { key: 'last_quarter', label: 'Last Quarter' },
+            { key: 'last_quarter_td', label: 'Last Quarter-to-date' },
+            { key: 'next_quarter', label: 'Next Quarter' }
+        ] },
+        { label: 'Years', items: [
+            { key: 'this_year', label: 'This Year' },
+            { key: 'this_year_td', label: 'This Year-to-date' },
+            { key: 'last_year', label: 'Last Year' },
+            { key: 'last_year_td', label: 'Last Year-to-date' },
+            { key: 'next_year', label: 'Next Year' }
+        ] },
+        { label: 'Rolling', items: [
+            { key: 'last_30', label: 'Last 30 Days' },
+            { key: 'last_365', label: 'Last 365 Days' },
+            { key: 'next_30', label: 'Next 30 Days' },
+            { key: 'next_365', label: 'Next 365 Days' },
+            { key: 'last_n', label: 'Last N…' },
+            { key: 'next_n', label: 'Next N…' }
+        ] }
     ];
 
     function _isoDate(d) {
@@ -549,42 +582,76 @@
         return d.getFullYear() + '-' + (mm.length < 2 ? '0' + mm : mm) + '-' + (dd.length < 2 ? '0' + dd : dd);
     }
 
-    function presetDates(preset) {
+    /**
+     * Resolve a preset key to {start, end} ISO date strings. 'all' returns
+     * {start: '', end: ''} (clears the filter). last_n/next_n take the count
+     * and unit ('days'|'weeks'|'months'|'quarters'|'years') as extra args:
+     * rolling windows anchored on today (inclusive).
+     * Weeks start Sunday; quarters are calendar quarters — both match
+     * Fishbowl's UtilDateRange.
+     */
+    function presetDates(preset, n, unit) {
         var now = new Date();
         var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        var start = null, end = null, d;
+        var y = today.getFullYear(), m = today.getMonth(), q = Math.floor(m / 3);
+        var weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        function addDays(base, days) { var d = new Date(base); d.setDate(d.getDate() + days); return d; }
+        var start = null, end = null;
         switch (preset) {
+            case 'all': return { start: '', end: '' };
             case 'today': start = end = today; break;
-            case 'yesterday':
-                d = new Date(today); d.setDate(d.getDate() - 1);
-                start = end = d; break;
-            case 'this_week':
-                start = new Date(today); start.setDate(start.getDate() - start.getDay());
-                end = new Date(start); end.setDate(end.getDate() + 6); break;
-            case 'last_week':
-                start = new Date(today); start.setDate(start.getDate() - start.getDay() - 7);
-                end = new Date(start); end.setDate(end.getDate() + 6); break;
-            case 'this_month':
-                start = new Date(today.getFullYear(), today.getMonth(), 1);
-                end = new Date(today.getFullYear(), today.getMonth() + 1, 0); break;
-            case 'last_month':
-                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                end = new Date(today.getFullYear(), today.getMonth(), 0); break;
-            case 'last_30':
-                start = new Date(today); start.setDate(start.getDate() - 29);
-                end = today; break;
-            case 'last_90':
-                start = new Date(today); start.setDate(start.getDate() - 89);
-                end = today; break;
-            case 'this_year':
-                start = new Date(today.getFullYear(), 0, 1);
-                end = new Date(today.getFullYear(), 11, 31); break;
-            case 'last_year':
-                start = new Date(today.getFullYear() - 1, 0, 1);
-                end = new Date(today.getFullYear() - 1, 11, 31); break;
-            case 'ytd':
-                start = new Date(today.getFullYear(), 0, 1);
-                end = today; break;
+            case 'yesterday': start = end = addDays(today, -1); break;
+
+            case 'this_week': start = weekStart; end = addDays(weekStart, 6); break;
+            case 'this_week_td': start = weekStart; end = today; break;
+            case 'last_week': start = addDays(weekStart, -7); end = addDays(weekStart, -1); break;
+            case 'last_week_td': start = addDays(weekStart, -7); end = addDays(weekStart, -7 + today.getDay()); break;
+            case 'next_week': start = addDays(weekStart, 7); end = addDays(weekStart, 13); break;
+            case 'next_4_weeks': start = addDays(weekStart, 7); end = addDays(weekStart, 7 + 27); break;
+
+            case 'this_month': start = new Date(y, m, 1); end = new Date(y, m + 1, 0); break;
+            case 'this_month_td': start = new Date(y, m, 1); end = today; break;
+            case 'last_month': start = new Date(y, m - 1, 1); end = new Date(y, m, 0); break;
+            case 'last_month_td':
+                start = new Date(y, m - 1, 1);
+                end = new Date(y, m - 1, Math.min(today.getDate(), new Date(y, m, 0).getDate())); break;
+            case 'next_month': start = new Date(y, m + 1, 1); end = new Date(y, m + 2, 0); break;
+
+            case 'this_quarter': start = new Date(y, q * 3, 1); end = new Date(y, q * 3 + 3, 0); break;
+            case 'this_quarter_td': start = new Date(y, q * 3, 1); end = today; break;
+            case 'last_quarter': start = new Date(y, (q - 1) * 3, 1); end = new Date(y, q * 3, 0); break;
+            case 'last_quarter_td':
+                start = new Date(y, (q - 1) * 3, 1);
+                end = new Date(y, (q - 1) * 3 + (m - q * 3), today.getDate()); break;
+            case 'next_quarter': start = new Date(y, (q + 1) * 3, 1); end = new Date(y, (q + 2) * 3, 0); break;
+
+            case 'this_year': start = new Date(y, 0, 1); end = new Date(y, 11, 31); break;
+            case 'this_year_td': start = new Date(y, 0, 1); end = today; break;
+            case 'last_year': start = new Date(y - 1, 0, 1); end = new Date(y - 1, 11, 31); break;
+            case 'last_year_td': start = new Date(y - 1, 0, 1); end = new Date(y - 1, m, today.getDate()); break;
+            case 'next_year': start = new Date(y + 1, 0, 1); end = new Date(y + 1, 11, 31); break;
+
+            case 'last_30': start = addDays(today, -29); end = today; break;
+            case 'last_365': start = addDays(today, -364); end = today; break;
+            case 'next_30': start = today; end = addDays(today, 29); break;
+            case 'next_365': start = today; end = addDays(today, 364); break;
+
+            case 'last_n': case 'next_n': {
+                n = parseInt(n, 10);
+                if (!n || n < 1) return null;
+                var back = preset === 'last_n';
+                var edge;
+                switch (unit) {
+                    case 'weeks': edge = addDays(today, back ? -(7 * n - 1) : 7 * n - 1); break;
+                    case 'months': edge = addDays(new Date(y, m + (back ? -n : n), today.getDate()), back ? 1 : -1); break;
+                    case 'quarters': edge = addDays(new Date(y, m + 3 * (back ? -n : n), today.getDate()), back ? 1 : -1); break;
+                    case 'years': edge = addDays(new Date(y + (back ? -n : n), m, today.getDate()), back ? 1 : -1); break;
+                    default: edge = addDays(today, back ? -(n - 1) : n - 1); break;
+                }
+                start = back ? edge : today;
+                end = back ? today : edge;
+                break;
+            }
             default: return null;
         }
         return { start: _isoDate(start), end: _isoDate(end) };
@@ -624,23 +691,61 @@
         var preset = document.createElement('select');
         preset.className = 'form-select form-select-sm cp-range-preset';
         preset.id = key + '_preset';
-        DATE_PRESETS.forEach(function (p) {
-            var opt = document.createElement('option');
-            opt.value = p.key;
-            opt.textContent = p.label;
-            preset.appendChild(opt);
+        DATE_PRESET_GROUPS.forEach(function (g) {
+            var parent = preset;
+            if (g.label) {
+                parent = document.createElement('optgroup');
+                parent.label = g.label;
+                preset.appendChild(parent);
+            }
+            g.items.forEach(function (p) {
+                var opt = document.createElement('option');
+                opt.value = p.key;
+                opt.textContent = p.label;
+                parent.appendChild(opt);
+            });
         });
-        preset.addEventListener('change', function () {
-            var range = presetDates(preset.value);
+
+        // "Last N… / Next N…" composer: count + unit, shown only when chosen.
+        var composer = document.createElement('div');
+        composer.className = 'cp-range-composer';
+        composer.hidden = true;
+        var count = document.createElement('input');
+        count.type = 'number';
+        count.min = '1';
+        count.value = '7';
+        count.className = 'form-control form-control-sm';
+        count.id = key + '_preset_n';
+        var unit = document.createElement('select');
+        unit.className = 'form-select form-select-sm';
+        unit.id = key + '_preset_unit';
+        ['days', 'weeks', 'months', 'quarters', 'years'].forEach(function (u) {
+            var opt = document.createElement('option');
+            opt.value = u;
+            opt.textContent = u.charAt(0).toUpperCase() + u.slice(1);
+            unit.appendChild(opt);
+        });
+        composer.appendChild(count);
+        composer.appendChild(unit);
+
+        function applyPreset() {
+            var range = presetDates(preset.value, count.value, unit.value);
             if (!range) return;
             start.value = range.start;
             end.value = range.end;
+        }
+        preset.addEventListener('change', function () {
+            composer.hidden = preset.value !== 'last_n' && preset.value !== 'next_n';
+            applyPreset();
         });
-        function toCustom() { preset.value = 'custom'; }
+        count.addEventListener('input', applyPreset);
+        unit.addEventListener('change', applyPreset);
+        function toCustom() { preset.value = 'custom'; composer.hidden = true; }
         start.addEventListener('input', toCustom);
         end.addEventListener('input', toCustom);
 
         wrap.appendChild(preset);
+        wrap.appendChild(composer);
         wrap.appendChild(group);
         return wrap;
     }

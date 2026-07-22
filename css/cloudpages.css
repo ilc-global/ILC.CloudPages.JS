@@ -39,6 +39,12 @@
 
 /* Relative-date preset picker above date-range inputs */
 .cp-range-preset { margin-bottom: 0.25rem; }
+.cp-range-composer {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+.cp-range-composer input { max-width: 90px; }
 
 /* Compact checkbox dropdown for multi-select parameters */
 .cp-multiselect { position: relative; }
