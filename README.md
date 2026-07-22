@@ -75,6 +75,9 @@ That's it. No JavaScript to write — cloudpages.js reads the config and wires e
 | `demo_data` | string | — | Path to a demo-data JSON file, fetched lazily outside JXBrowser (see [Demo Mode](docs/demo-mode.md)) |
 | `collapsible_parameters` | boolean | `true` | Render parameters in a collapsible panel that auto-collapses after a successful run |
 | `parameters_label` | string | `"Parameters"` | Heading of the collapsible panel |
+| `column_toggles` | boolean | `false` | Runtime show/hide-columns button (requires the DataTables Buttons+ColVis extension vendored) |
+| `group_by` | string | — | Group rows by this column key (requires the DataTables RowGroup extension vendored) |
+| `group_totals` | string[] | — | Column keys subtotaled per group. Note: subtotal-row cell alignment assumes the initial column visibility; combining with runtime column toggles can misalign the totals row |
 
 ### Parameters (`#parameters`)
 

@@ -710,14 +710,65 @@
         container.appendChild(table);
 
         // Initialize DataTable
-        _dataTableInstance = $(table).DataTable({
+        var dtConfig = {
             data: rows,
             columns: dtColumns,
             pageLength: settings.page_length || 25,
             order: [],
             autoWidth: true,
             responsive: true
-        });
+        };
+
+        // Runtime column show/hide via the DataTables Buttons ColVis extension
+        // (settings.column_toggles). Requires the Buttons extension vendored;
+        // degrades silently to a plain table when absent.
+        if (settings.column_toggles && $.fn.dataTable.Buttons) {
+            dtConfig.buttons = [{ extend: 'colvis', text: 'Columns' }];
+            dtConfig.dom = 'Blfrtip';
+        }
+
+        // Grouped rows with per-group subtotals (settings.group_by +
+        // settings.group_totals). Requires the RowGroup extension vendored.
+        if (settings.group_by && $.fn.dataTable.RowGroup) {
+            var groupKey = settings.group_by;
+            var totalKeys = settings.group_totals || [];
+            var keyIndex = {};
+            allKeys.forEach(function (k, i) { keyIndex[k] = i; });
+            dtConfig.orderFixed = [[keyIndex[groupKey] || 0, 'asc']];
+            dtConfig.rowGroup = {
+                dataSrc: groupKey,
+                startRender: function (groupRows, group) {
+                    return group + ' (' + groupRows.count() + ')';
+                },
+                endRender: totalKeys.length ? function (groupRows) {
+                    var totals = {};
+                    totalKeys.forEach(function (k) { totals[k] = 0; });
+                    groupRows.data().each(function (row) {
+                        totalKeys.forEach(function (k) {
+                            var n = parseFloat(row[k]);
+                            if (!isNaN(n)) totals[k] += n;
+                        });
+                    });
+                    var tr = document.createElement('tr');
+                    allKeys.forEach(function (k, i) {
+                        if (dtColumns[i].visible === false) return;
+                        var td = document.createElement('td');
+                        if (totals[k] !== undefined) {
+                            var renderFn = columnRenderFn(columns[k], settings);
+                            td.textContent = renderFn ? renderFn(totals[k]) : formatNumber(totals[k], settings.qty_unit_format);
+                            td.style.fontWeight = '600';
+                        } else if (i === 0 || k === groupKey) {
+                            td.textContent = 'Total';
+                            td.style.fontWeight = '600';
+                        }
+                        tr.appendChild(td);
+                    });
+                    return tr;
+                } : null
+            };
+        }
+
+        _dataTableInstance = $(table).DataTable(dtConfig);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -869,6 +920,9 @@
             return rows.filter(function (row) {
                 return Object.keys(parameters).every(function (name) {
                     var cfg = parameters[name];
+                    // Params that shape the SQL but don't filter rows
+                    // (e.g. a date-column selector) opt out of demo filtering.
+                    if (cfg.demo_filter === false) return true;
                     var cell = row[cfg.demo_column || name];
                     if (cfg.mode === 'range') {
                         return demoInRange(cell, params[name + '_start'], params[name + '_end'], cfg.type);
