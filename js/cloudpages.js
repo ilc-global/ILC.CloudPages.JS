@@ -252,13 +252,75 @@
         }
     });
 
+    // Multi dropdowns render as a compact checkbox dropdown (normal control
+    // height, "All" / "N selected" summary) instead of a <select multiple>
+    // list box — no Ctrl+click, no tall uneven parameter rows.
+    function renderMultiDropdown(key, cfg) {
+        var wrap = document.createElement('div');
+        wrap.className = 'cp-multiselect';
+        wrap.id = key;
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'form-select text-start cp-ms-toggle';
+        btn.textContent = 'All';
+        wrap.appendChild(btn);
+
+        var menu = document.createElement('div');
+        menu.className = 'cp-ms-menu';
+        wrap.appendChild(menu);
+
+        function update() {
+            var sel = menu.querySelectorAll('input:checked');
+            btn.textContent = !sel.length ? 'All'
+                : (sel.length === 1 ? sel[0].parentNode.textContent.trim()
+                    : sel.length + ' selected');
+        }
+        function addOption(value, label) {
+            var lab = document.createElement('label');
+            lab.className = 'cp-ms-option';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'form-check-input';
+            cb.value = String(value);
+            cb.addEventListener('change', update);
+            lab.appendChild(cb);
+            lab.appendChild(document.createTextNode(' ' + label));
+            menu.appendChild(lab);
+        }
+
+        btn.addEventListener('click', function () { wrap.classList.toggle('open'); });
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) wrap.classList.remove('open');
+        });
+
+        if (cfg.options) {
+            cfg.options.forEach(function (o) {
+                addOption(o.value, o.label !== undefined ? o.label : String(o.value));
+            });
+        } else if (cfg.sql) {
+            FB.queryAsync(cfg.sql).then(function (rows) {
+                var displayFields = cfg.display ? cfg.display.split(',') : null;
+                (rows || []).forEach(function (row) {
+                    var label = displayFields
+                        ? displayFields.map(function (f) { return row[f.trim()]; }).join(', ')
+                        : row[cfg.value];
+                    addOption(row[cfg.value], label);
+                });
+            }).catch(function (err) {
+                console.error('CloudPages: failed to load options for ' + key + ':', err);
+            });
+        }
+        return wrap;
+    }
+
     // --- Dropdown ---
     registerRenderer('dropdown', {
         render: function (key, cfg) {
+            if (cfg.mode === 'multi') return renderMultiDropdown(key, cfg);
             var select = document.createElement('select');
             select.className = 'form-select';
             select.id = key;
-            if (cfg.mode === 'multi') select.multiple = true;
 
             // Default placeholder option
             var placeholder = document.createElement('option');
@@ -284,25 +346,15 @@
                 loadDropdownOptions(select, cfg);
             }
 
-            if (cfg.mode === 'multi') {
-                var helper = document.createElement('small');
-                helper.className = 'form-text text-muted';
-                helper.textContent = 'Ctrl+click to multi-select';
-                var container = document.createElement('div');
-                container.appendChild(select);
-                container.appendChild(helper);
-                return container;
-            }
-
             return select;
         },
         getValue: function (key, cfg) {
             var el = document.getElementById(key);
             if (!el) return undefined;
             if (cfg && cfg.mode === 'multi') {
-                return Array.from(el.selectedOptions)
-                    .map(function (o) { return o.value; })
-                    .filter(function (v) { return v !== ''; });
+                return Array.prototype.map.call(
+                    el.querySelectorAll('.cp-ms-menu input:checked'),
+                    function (cb) { return cb.value; });
             }
             return el.value !== '' ? el.value : undefined;
         }
@@ -541,6 +593,7 @@
 
             var formGroup = document.createElement('div');
             formGroup.className = 'mb-3';
+            if (cfg.mode === 'range') formGroup.className += ' cp-span-2';
 
             var label = document.createElement('label');
             label.className = 'form-label';

@@ -25,10 +25,50 @@
 .cp-param-panel[open] > .cp-param-summary::before { transform: rotate(90deg); }
 .cp-param-fields {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 0 1rem;
     margin-top: 1rem;
+    align-items: start;
 }
+/* Range (from/to) fields take two grid tracks so they never squeeze */
+.cp-param-fields .cp-span-2 { grid-column: span 2; }
+@media (max-width: 500px) {
+    .cp-param-fields .cp-span-2 { grid-column: auto; }
+}
+.cp-param-fields .cp-range-group .form-control { min-width: 0; }
+
+/* Compact checkbox dropdown for multi-select parameters */
+.cp-multiselect { position: relative; }
+.cp-multiselect .cp-ms-toggle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cp-ms-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 100%;
+    max-height: 240px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 4px 0;
+    z-index: 1050;
+}
+.cp-multiselect.open .cp-ms-menu { display: block; }
+.cp-ms-option {
+    display: block;
+    padding: 4px 12px;
+    margin: 0;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 0.875rem;
+}
+.cp-ms-option:hover { background-color: #e9ecef; }
 
 /* Required asterisk */
 .cp-required {
