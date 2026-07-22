@@ -268,8 +268,19 @@
             placeholder.selected = true;
             select.appendChild(placeholder);
 
-            // Load options from SQL if provided
-            if (cfg.sql) {
+            // Static option list, or options loaded from SQL
+            if (cfg.options) {
+                cfg.options.forEach(function (o) {
+                    var opt = document.createElement('option');
+                    opt.value = String(o.value);
+                    opt.textContent = o.label !== undefined ? o.label : String(o.value);
+                    if (cfg.default !== undefined && String(cfg.default) === String(o.value)) {
+                        placeholder.selected = false;
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                });
+            } else if (cfg.sql) {
                 loadDropdownOptions(select, cfg);
             }
 

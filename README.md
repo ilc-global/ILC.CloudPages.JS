@@ -79,6 +79,8 @@ That's it. No JavaScript to write — cloudpages.js reads the config and wires e
 | `group_by` | string | — | Group rows by this column key (requires the DataTables RowGroup extension vendored) |
 | `group_totals` | string[] | — | Column keys subtotaled per group. Note: subtotal-row cell alignment assumes the initial column visibility; combining with runtime column toggles can misalign the totals row |
 
+Dropdown parameters accept a static `options` array (`[{ "value": "10", "label": "Entered" }, …]`) as an alternative to `sql`-loaded options; `default` pre-selects by value.
+
 ### Parameters (`#parameters`)
 
 Object keyed by parameter name. Each parameter has:
