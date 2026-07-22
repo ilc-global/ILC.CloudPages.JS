@@ -88,6 +88,14 @@ Decimal number input with `step="0.01"`. Supports `mode: "range"`.
 
 Date picker. This is the most commonly used range type.
 
+Date ranges automatically get a **relative-date preset picker** above the
+from/to inputs (Today, Yesterday, This/Last Week, This/Last Month, Last
+30/90 Days, This/Last Year, Year to Date) — mirroring Fishbowl's report
+dialogs. Picking a preset fills both inputs; editing either input switches
+the picker back to Custom. Weeks start on Sunday. The computed dates are
+plain values in the inputs, so demo filtering and SQL binding are unaffected.
+`CloudPages.presetDates(key)` exposes the computation.
+
 ```json
 {
     "date_issued": {

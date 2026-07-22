@@ -37,6 +37,9 @@
 }
 .cp-param-fields .cp-range-group .form-control { min-width: 0; }
 
+/* Relative-date preset picker above date-range inputs */
+.cp-range-preset { margin-bottom: 0.25rem; }
+
 /* Compact checkbox dropdown for multi-select parameters */
 .cp-multiselect { position: relative; }
 .cp-multiselect .cp-ms-toggle {

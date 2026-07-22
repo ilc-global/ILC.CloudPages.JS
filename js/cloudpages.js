@@ -523,6 +523,75 @@
         }
     }
 
+    // --- Relative date presets (date ranges only) ---
+    // Mirrors Fishbowl's report-dialog relative dates: picking a preset fills
+    // the from/to inputs; editing either input switches back to Custom.
+    // Weeks start on Sunday, matching Fishbowl.
+
+    var DATE_PRESETS = [
+        { key: 'custom', label: 'Custom' },
+        { key: 'today', label: 'Today' },
+        { key: 'yesterday', label: 'Yesterday' },
+        { key: 'this_week', label: 'This Week' },
+        { key: 'last_week', label: 'Last Week' },
+        { key: 'this_month', label: 'This Month' },
+        { key: 'last_month', label: 'Last Month' },
+        { key: 'last_30', label: 'Last 30 Days' },
+        { key: 'last_90', label: 'Last 90 Days' },
+        { key: 'this_year', label: 'This Year' },
+        { key: 'last_year', label: 'Last Year' },
+        { key: 'ytd', label: 'Year to Date' }
+    ];
+
+    function _isoDate(d) {
+        var mm = String(d.getMonth() + 1);
+        var dd = String(d.getDate());
+        return d.getFullYear() + '-' + (mm.length < 2 ? '0' + mm : mm) + '-' + (dd.length < 2 ? '0' + dd : dd);
+    }
+
+    function presetDates(preset) {
+        var now = new Date();
+        var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var start = null, end = null, d;
+        switch (preset) {
+            case 'today': start = end = today; break;
+            case 'yesterday':
+                d = new Date(today); d.setDate(d.getDate() - 1);
+                start = end = d; break;
+            case 'this_week':
+                start = new Date(today); start.setDate(start.getDate() - start.getDay());
+                end = new Date(start); end.setDate(end.getDate() + 6); break;
+            case 'last_week':
+                start = new Date(today); start.setDate(start.getDate() - start.getDay() - 7);
+                end = new Date(start); end.setDate(end.getDate() + 6); break;
+            case 'this_month':
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0); break;
+            case 'last_month':
+                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                end = new Date(today.getFullYear(), today.getMonth(), 0); break;
+            case 'last_30':
+                start = new Date(today); start.setDate(start.getDate() - 29);
+                end = today; break;
+            case 'last_90':
+                start = new Date(today); start.setDate(start.getDate() - 89);
+                end = today; break;
+            case 'this_year':
+                start = new Date(today.getFullYear(), 0, 1);
+                end = new Date(today.getFullYear(), 11, 31); break;
+            case 'last_year':
+                start = new Date(today.getFullYear() - 1, 0, 1);
+                end = new Date(today.getFullYear() - 1, 11, 31); break;
+            case 'ytd':
+                start = new Date(today.getFullYear(), 0, 1);
+                end = today; break;
+            default: return null;
+        }
+        return { start: _isoDate(start), end: _isoDate(end) };
+    }
+
+    CloudPages.presetDates = presetDates;
+
     // --- Range input helper ---
     function renderRangeInput(key, type, attrs) {
         var group = document.createElement('div');
@@ -547,7 +616,33 @@
         group.appendChild(start);
         group.appendChild(divider);
         group.appendChild(end);
-        return group;
+
+        if (type !== 'date') return group;
+
+        // Date ranges get a relative-date preset picker above the inputs.
+        var wrap = document.createElement('div');
+        var preset = document.createElement('select');
+        preset.className = 'form-select form-select-sm cp-range-preset';
+        preset.id = key + '_preset';
+        DATE_PRESETS.forEach(function (p) {
+            var opt = document.createElement('option');
+            opt.value = p.key;
+            opt.textContent = p.label;
+            preset.appendChild(opt);
+        });
+        preset.addEventListener('change', function () {
+            var range = presetDates(preset.value);
+            if (!range) return;
+            start.value = range.start;
+            end.value = range.end;
+        });
+        function toCustom() { preset.value = 'custom'; }
+        start.addEventListener('input', toCustom);
+        end.addEventListener('input', toCustom);
+
+        wrap.appendChild(preset);
+        wrap.appendChild(group);
+        return wrap;
     }
 
     function getRangeValue(key) {
