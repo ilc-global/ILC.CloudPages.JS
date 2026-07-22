@@ -40,10 +40,11 @@ FROM poitem poi
 JOIN po ON po.id = poi.poId
 JOIN vendor v ON v.id = po.vendorId
 LEFT JOIN part ON part.id = poi.partId
-WHERE (:date_expected_start IS NULL OR DATE(poi.dateScheduledFulfillment) >= :date_expected_start)
-  AND (:date_expected_end IS NULL OR DATE(poi.dateScheduledFulfillment) <= :date_expected_end)
-  AND (:vendor IS NULL OR po.vendorId = :vendor)
-  AND (:part IS NULL OR part.num LIKE CONCAT('%', :part, '%'))
+WHERE poi.qtyFulfilled < poi.qtyToFulfill
+  AND DATE(poi.dateScheduledFulfillment) >= :date_expected_start /*opt:date_expected_start*/
+  AND DATE(poi.dateScheduledFulfillment) <= :date_expected_end /*opt:date_expected_end*/
+  AND po.vendorId = :vendor /*opt:vendor*/
+  AND part.num LIKE CONCAT('%', :part, '%') /*opt:part*/
     </script>
 
     <script id="columns" type="application/json">

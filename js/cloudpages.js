@@ -67,6 +67,23 @@
     // [3] SQL Binding Engine
     // ═══════════════════════════════════════════════════════════════════
 
+    // Optional parameters: a line tagged /*opt:param_name*/ is removed before
+    // binding when that parameter is empty, so blank filters simply vanish
+    // from the WHERE clause instead of leaving an unbound :name. Demo mode
+    // never prunes — the demo filter treats empty values as no-filter and the
+    // SQL text must keep matching the #query tag for demo data lookup.
+    function pruneOptionalClauses(sql, values) {
+        return sql.split('\n').filter(function (line) {
+            var m = line.match(/\/\*opt:([A-Za-z0-9_]+)\*\//);
+            if (!m) return true;
+            var v = values[m[1]];
+            return !(v === undefined || v === null || v === '' || v === false ||
+                (Array.isArray(v) && v.length === 0));
+        }).join('\n');
+    }
+
+    CloudPages.pruneOptionalClauses = pruneOptionalClauses;
+
     function bindParams(sql, values) {
         var bindings = {};
 
@@ -748,7 +765,9 @@
         // Demo mode: keep the original SQL text (so the DemoAdapter can match
         // it to the #query tag) and pass raw values — arrays and ranges intact
         // for the generated demo filter (see Demo Mode section).
-        var bound = FB.isDemo ? { sql: sql, bindings: values } : bindParams(sql, values);
+        var bound = FB.isDemo
+            ? { sql: sql, bindings: values }
+            : bindParams(pruneOptionalClauses(sql, values), values);
 
         FB.setStatus('Running query...');
         FB.setProgress(-1);
