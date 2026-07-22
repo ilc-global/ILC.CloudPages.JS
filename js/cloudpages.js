@@ -699,14 +699,22 @@
 
         _lastResultRows = rows;
 
-        // Build column definitions from result keys
-        var allKeys = Object.keys(rows[0]);
+        // Build column definitions from the union of all row keys — rows from
+        // SQL are uniform, but demo/JSON rows may omit keys per row.
+        var keySet = {};
+        var allKeys = [];
+        rows.forEach(function (row) {
+            Object.keys(row).forEach(function (k) {
+                if (!keySet[k]) { keySet[k] = true; allKeys.push(k); }
+            });
+        });
         var dtColumns = allKeys.map(function (key) {
             var colCfg = columns[key] || {};
             var def = {
                 data: key,
                 title: colCfg.label || snakeToTitle(key),
-                visible: colCfg.visible !== false
+                visible: colCfg.visible !== false,
+                defaultContent: ''
             };
             if (colCfg.width) def.width = colCfg.width;
             var renderFn = columnRenderFn(colCfg, settings);
