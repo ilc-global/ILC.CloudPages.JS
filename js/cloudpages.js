@@ -994,10 +994,18 @@
         // Runtime column show/hide via the DataTables Buttons ColVis extension
         // (settings.column_toggles). Requires the Buttons extension vendored;
         // degrades silently to a plain table when absent.
-        if (settings.column_toggles && $.fn.dataTable.Buttons) {
+        var hasButtons = settings.column_toggles && $.fn.dataTable.Buttons;
+        if (hasButtons) {
             dtConfig.buttons = [{ extend: 'colvis', text: 'Columns' }];
-            dtConfig.dom = 'Blfrtip';
         }
+
+        // One toolbar row above the table: [Columns] [Show N entries] left,
+        // search right; info + paging share a row below.
+        dtConfig.dom =
+            "<'cp-table-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2'" +
+            "<'d-flex align-items-center gap-2'" + (hasButtons ? 'Bl' : 'l') + ">f>" +
+            "rt" +
+            "<'d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2'ip>";
 
         // Grouped rows with per-group subtotals (settings.group_by +
         // settings.group_totals). Requires the RowGroup extension vendored.
