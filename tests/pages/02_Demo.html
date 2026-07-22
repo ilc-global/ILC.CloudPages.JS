@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>CloudPages Demo Mode Test</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="../../css/cloudpages.css">
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <script src="../../js/fb.js"></script>
+    <script src="../../js/cloudpages.js"></script>
+
+    <script id="settings" type="application/json">
+    { "load_on_open": true, "page_length": 10 }
+    </script>
+
+    <script id="parameters" type="application/json">
+    {
+        "date_expected": { "label": "Expected Date", "type": "date", "mode": "range" },
+        "vendor": {
+            "label": "Vendor", "type": "dropdown", "mode": "single",
+            "sql": "SELECT id, name FROM vendor WHERE activeFlag = 1 ORDER BY name",
+            "value": "id", "display": "name",
+            "demo_column": "vendor_id"
+        },
+        "part": { "label": "Part contains", "type": "string", "demo_column": "part_num" }
+    }
+    </script>
+
+    <script id="query" type="text/plain">
+SELECT po.num AS po_num, v.name AS vendor, part.num AS part_num,
+       poi.qtyToFulfill AS qty_ordered, poi.qtyFulfilled AS qty_received,
+       poi.dateScheduledFulfillment AS date_expected
+FROM poitem poi
+JOIN po ON po.id = poi.poId
+JOIN vendor v ON v.id = po.vendorId
+LEFT JOIN part ON part.id = poi.partId
+WHERE (:date_expected_start IS NULL OR DATE(poi.dateScheduledFulfillment) >= :date_expected_start)
+  AND (:date_expected_end IS NULL OR DATE(poi.dateScheduledFulfillment) <= :date_expected_end)
+  AND (:vendor IS NULL OR po.vendorId = :vendor)
+  AND (:part IS NULL OR part.num LIKE CONCAT('%', :part, '%'))
+    </script>
+
+    <script id="columns" type="application/json">
+    {
+        "po_num": { "label": "PO #" },
+        "qty_ordered": { "label": "Ordered", "format": "number" },
+        "qty_received": { "label": "Received", "format": "number" },
+        "date_expected": { "label": "Expected", "format": "date" }
+    }
+    </script>
+
+    <script id="demo" type="application/json">
+    {
+        "query": [
+            { "po_num": "PO-1001", "vendor": "Acme Fasteners", "vendor_id": 1, "part_num": "BOLT-M8",  "qty_ordered": 500, "qty_received": 200, "date_expected": "2026-07-10" },
+            { "po_num": "PO-1001", "vendor": "Acme Fasteners", "vendor_id": 1, "part_num": "NUT-M8",   "qty_ordered": 500, "qty_received": 0,   "date_expected": "2026-07-10" },
+            { "po_num": "PO-1002", "vendor": "Bolt Barn",      "vendor_id": 2, "part_num": "WASH-8",   "qty_ordered": 100, "qty_received": 0,   "date_expected": "2026-07-20" },
+            { "po_num": "PO-1003", "vendor": "Crate & Co",     "vendor_id": 3, "part_num": "BOLT-M10", "qty_ordered": 250, "qty_received": 100, "date_expected": "2026-08-01" }
+        ],
+        "parameters": {
+            "vendor": [
+                { "id": 1, "name": "Acme Fasteners" },
+                { "id": 2, "name": "Bolt Barn" },
+                { "id": 3, "name": "Crate & Co" }
+            ]
+        },
+        "user": { "companyName": "Demo Co", "username": "demo", "email": "demo@example.com", "userId": 1, "groups": ["1"] }
+    }
+    </script>
+</head>
+<body>
+    <div class="container-fluid py-3">
+        <h4>Demo Mode Test</h4>
+        <div id="parametersContainer"></div>
+        <button id="submitButton" class="btn btn-primary mb-3">Run Report</button>
+        <button id="exportBtn" class="btn btn-secondary mb-3">Export</button>
+        <div id="tableContainer"></div>
+    </div>
+</body>
+</html>

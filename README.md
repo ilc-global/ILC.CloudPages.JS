@@ -175,6 +175,7 @@ CloudPages.registerRenderer('color', {
 - **[Hooks & Customization](docs/hooks-and-customization.md)** — Lifecycle hooks, custom renderers, public API
 - **[SQL Patterns](docs/sql-patterns.md)** — Common Fishbowl queries for sales, purchasing, inventory, shipping
 - **[Examples](docs/examples.md)** — Complete, copy-paste report pages
+- **[Demo Mode](docs/demo-mode.md)** — Run the full report (filters, dropdowns, export) in a plain browser from bundled demo data
 
 ## Project Structure
 

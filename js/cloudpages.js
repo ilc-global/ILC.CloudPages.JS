@@ -6,7 +6,7 @@
  *
  * Dependencies: fb.js (loaded first), jQuery, DataTables, SheetJS (XLSX)
  *
- * @version 2.0.0
+ * @version 2.1.0
  * @license Source-Available (ILC Technology LLC)
  */
 (function (window, $) {
@@ -745,7 +745,10 @@
         sql = hooked.sql;
         values = hooked.params;
 
-        var bound = bindParams(sql, values);
+        // Demo mode: keep the original SQL text (so the DemoAdapter can match
+        // it to the #query tag) and pass raw values — arrays and ranges intact
+        // for the generated demo filter (see Demo Mode section).
+        var bound = FB.isDemo ? { sql: sql, bindings: values } : bindParams(sql, values);
 
         FB.setStatus('Running query...');
         FB.setProgress(-1);
@@ -764,7 +767,106 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // [9] Lifecycle / Init
+    // [9] Demo Mode
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Outside JXBrowser, demo data makes the full report work in a plain
+    // browser (parameter dropdowns, filtered results, export). Sources:
+    //   1. Inline <script id="demo" type="application/json"> (wins if both)
+    //   2. settings.demo_data — path to a JSON file, fetched lazily so
+    //      production pages never load or parse demo rows.
+    // JSON shape:
+    //   { "query": [row, ...],                     result rows for the report
+    //     "parameters": { "<name>": [row, ...] },  rows for SQL-driven params
+    //     "user": {...}, "context": {...} }        optional fb.js demo extras
+    // Result filtering mirrors the SQL WHERE clause: each parameter filters
+    // the demo-row column named by its `demo_column` (default: the parameter
+    // name), using predicates derived from the parameter type/mode.
+
+    function setupDemoMode(config) {
+        if (FB.isJXBrowser) return Promise.resolve(false);
+
+        var inline = document.getElementById('demo');
+        var loaded;
+        if (inline) {
+            try {
+                loaded = Promise.resolve(JSON.parse(inline.textContent.trim()));
+            } catch (e) {
+                loaded = Promise.reject(new Error('<script id="demo"> has invalid JSON: ' + e.message));
+            }
+        } else if (config.settings.demo_data) {
+            loaded = fetch(config.settings.demo_data).then(function (res) {
+                if (!res.ok) throw new Error('demo_data fetch failed: HTTP ' + res.status);
+                return res.json();
+            });
+        } else {
+            return Promise.resolve(false);
+        }
+
+        return loaded.then(function (demo) {
+            var queries = {};
+            Object.keys(config.parameters).forEach(function (name) {
+                var cfg = config.parameters[name];
+                if (cfg.sql && demo.parameters && demo.parameters[name]) {
+                    queries[cfg.sql.trim()] = demo.parameters[name];
+                }
+            });
+            queries[config.query.trim()] = makeDemoQueryFn(demo.query || [], config.parameters);
+            FB.configure({
+                environment: 'demo',
+                demoData: { queries: queries, user: demo.user, context: demo.context }
+            });
+            return true;
+        });
+    }
+
+    function makeDemoQueryFn(rows, parameters) {
+        return function (params) {
+            return rows.filter(function (row) {
+                return Object.keys(parameters).every(function (name) {
+                    var cfg = parameters[name];
+                    var cell = row[cfg.demo_column || name];
+                    if (cfg.mode === 'range') {
+                        return demoInRange(cell, params[name + '_start'], params[name + '_end'], cfg.type);
+                    }
+                    var val = params[name];
+                    if (val === undefined || val === null || val === '' ||
+                        (Array.isArray(val) && !val.length)) return true;
+                    if (Array.isArray(val)) {
+                        return val.some(function (v) { return String(cell) === String(v); });
+                    }
+                    if (cfg.type === 'checkbox') {
+                        return !val || cell === true || cell === 1 || cell === '1' || cell === 'true';
+                    }
+                    if (cfg.type === 'string') {
+                        return String(cell == null ? '' : cell).toLowerCase()
+                            .indexOf(String(val).toLowerCase()) >= 0;
+                    }
+                    return String(cell) === String(val);
+                });
+            });
+        };
+    }
+
+    function demoInRange(cell, start, end, type) {
+        if (!start && !end) return true;
+        if (cell === undefined || cell === null) return false;
+        if (type === 'int' || type === 'decimal') {
+            var n = parseFloat(cell);
+            if (start && n < parseFloat(start)) return false;
+            if (end && n > parseFloat(end)) return false;
+            return true;
+        }
+        // date/time/timestamp: ISO strings compare lexicographically; compare
+        // only the bound's own length so a date bound matches timestamp cells.
+        var s = String(cell);
+        if (start && s.slice(0, String(start).length) < String(start)) return false;
+        if (end && s.slice(0, String(end).length) > String(end)) return false;
+        return true;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // [10] Lifecycle / Init
     // ═══════════════════════════════════════════════════════════════════
 
     function init() {
@@ -775,6 +877,18 @@
             return;
         }
 
+        // Demo setup must finish before the UI renders: SQL-driven parameters
+        // (dropdowns) query as soon as they render.
+        setupDemoMode(config).then(function () {
+            initUI(config);
+        }).catch(function (e) {
+            console.error('CloudPages: demo setup failed:', e.message);
+            var container = document.getElementById('tableContainer');
+            if (container) container.innerHTML = '<p class="text-danger">Demo data failed to load: ' + (e.message || e) + '</p>';
+        });
+    }
+
+    function initUI(config) {
         var paramContainer = document.getElementById('parametersContainer');
         if (paramContainer) {
             renderParameters(config.parameters, paramContainer);
@@ -823,7 +937,7 @@
     document.addEventListener('DOMContentLoaded', init);
 
     // ═══════════════════════════════════════════════════════════════════
-    // [10] Public API
+    // [11] Public API
     // ═══════════════════════════════════════════════════════════════════
 
     CloudPages.init = init;
