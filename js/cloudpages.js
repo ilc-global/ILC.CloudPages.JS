@@ -1085,15 +1085,66 @@
     // [7] Export Engine
     // ═══════════════════════════════════════════════════════════════════
 
+    /**
+     * Build the export workbook, applying column formats from the columns
+     * config: 'date' columns become real date cells (typed, mm/dd/yyyy),
+     * 'currency'/'number'/'percent' become numeric cells with number formats —
+     * so Excel can sort, filter, and pivot them natively.
+     */
+    function buildWorkbook(rows) {
+        var columns = (_config && _config.columns) || {};
+        var data = rows.map(function (row) {
+            var out = {};
+            Object.keys(row).forEach(function (k) {
+                var fmt = (columns[k] || {}).format;
+                var v = row[k];
+                if (v !== null && v !== undefined && v !== '') {
+                    if (fmt === 'date') {
+                        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+                        if (m) v = new Date(+m[1], +m[2] - 1, +m[3]);
+                        else if (!isNaN(new Date(v).getTime())) v = new Date(v);
+                    } else if (fmt === 'currency' || fmt === 'number' || fmt === 'percent') {
+                        var n = parseFloat(v);
+                        if (!isNaN(n)) v = n;
+                    }
+                }
+                out[k] = v;
+            });
+            return out;
+        });
+        var ws = XLSX.utils.json_to_sheet(data, { cellDates: true });
+        // Number formats per column
+        if (data.length) {
+            var keys = Object.keys(data[0]);
+            var range = XLSX.utils.decode_range(ws['!ref']);
+            keys.forEach(function (k, c) {
+                var fmt = (columns[k] || {}).format;
+                var z = fmt === 'date' ? 'mm/dd/yyyy'
+                    : fmt === 'currency' ? '$#,##0.00'
+                    : fmt === 'number' ? '#,##0.00'
+                    : fmt === 'percent' ? '0.00%'
+                    : null;
+                if (!z) return;
+                for (var r = range.s.r + 1; r <= range.e.r; r++) {
+                    var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+                    if (cell && (cell.t === 'n' || cell.t === 'd')) cell.z = z;
+                }
+            });
+        }
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        return wb;
+    }
+
+    CloudPages.buildWorkbook = buildWorkbook;
+
     function exportXLSX(rows, filename) {
         if (typeof XLSX === 'undefined') {
             console.error('CloudPages: SheetJS (XLSX) not loaded.');
             return;
         }
         var data = CloudPages.hooks.onExport(rows, 'xlsx');
-        var ws = XLSX.utils.json_to_sheet(data);
-        var wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        var wb = buildWorkbook(data);
 
         if (FB.isJXBrowser) {
             var b64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
