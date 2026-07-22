@@ -7,6 +7,22 @@ Common SQL patterns for building CloudPages reports against a Fishbowl database.
 - **Column aliases:** Use `AS` to name your columns. The alias becomes the key in result rows and the key in your `columns` config. Fishbowl returns lowercase column names, so use aliases to get predictable names.
 - **Parameterized queries:** All values passed through `FB.query()` are `Map<String, String>` — every value is a string. Fishbowl's MySQL will handle type coercion.
 - **LIMIT:** Always include a `LIMIT` clause to prevent runaway queries.
+- **Optional parameters:** Tag a WHERE line with `/*opt:param_name*/` and the
+  engine removes that line before binding when the parameter is empty
+  (`''`, unchecked checkbox, nothing selected) — so blank filters simply
+  vanish instead of leaving an unbound `:name`. One tagged clause per line;
+  a range parameter uses its `_start`/`_end` keys:
+
+  ```sql
+  WHERE so.statusId IN (20, 25)
+    AND DATE(so.dateIssued) >= :date_issued_start /*opt:date_issued_start*/
+    AND DATE(so.dateIssued) <= :date_issued_end /*opt:date_issued_end*/
+    AND so.customerId = :customer /*opt:customer*/
+  ```
+
+  Parameters without the tag follow the old rule: mark them `required` or
+  guarantee a `default`. In demo mode pruning is skipped — the demo filter
+  already treats empty values as no-filter (see demo-mode.md).
 
 ## Sales Orders
 

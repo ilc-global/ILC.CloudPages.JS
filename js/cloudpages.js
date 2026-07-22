@@ -6,7 +6,7 @@
  *
  * Dependencies: fb.js (loaded first), jQuery, DataTables, SheetJS (XLSX)
  *
- * @version 2.0.0
+ * @version 2.1.0
  * @license Source-Available (ILC Technology LLC)
  */
 (function (window, $) {
@@ -66,6 +66,23 @@
     // ═══════════════════════════════════════════════════════════════════
     // [3] SQL Binding Engine
     // ═══════════════════════════════════════════════════════════════════
+
+    // Optional parameters: a line tagged /*opt:param_name*/ is removed before
+    // binding when that parameter is empty, so blank filters simply vanish
+    // from the WHERE clause instead of leaving an unbound :name. Demo mode
+    // never prunes — the demo filter treats empty values as no-filter and the
+    // SQL text must keep matching the #query tag for demo data lookup.
+    function pruneOptionalClauses(sql, values) {
+        return sql.split('\n').filter(function (line) {
+            var m = line.match(/\/\*opt:([A-Za-z0-9_]+)\*\//);
+            if (!m) return true;
+            var v = values[m[1]];
+            return !(v === undefined || v === null || v === '' || v === false ||
+                (Array.isArray(v) && v.length === 0));
+        }).join('\n');
+    }
+
+    CloudPages.pruneOptionalClauses = pruneOptionalClauses;
 
     function bindParams(sql, values) {
         var bindings = {};
@@ -235,13 +252,92 @@
         }
     });
 
+    // Multi dropdowns render as a compact checkbox dropdown (normal control
+    // height, "All" / "N selected" summary) instead of a <select multiple>
+    // list box — no Ctrl+click, no tall uneven parameter rows.
+    function renderMultiDropdown(key, cfg) {
+        var wrap = document.createElement('div');
+        wrap.className = 'cp-multiselect';
+        wrap.id = key;
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'form-select text-start cp-ms-toggle';
+        btn.textContent = 'All';
+        wrap.appendChild(btn);
+
+        var menu = document.createElement('div');
+        menu.className = 'cp-ms-menu';
+        wrap.appendChild(menu);
+
+        // Type-to-filter box at the top of the menu — lists can hold
+        // hundreds/thousands of options (vendors, parts).
+        var search = document.createElement('input');
+        search.type = 'text';
+        search.className = 'form-control form-control-sm cp-ms-search';
+        search.placeholder = 'Type to filter…';
+        search.addEventListener('input', function () {
+            var q = search.value.toLowerCase();
+            Array.prototype.forEach.call(menu.querySelectorAll('.cp-ms-option'), function (opt) {
+                opt.hidden = q !== '' && opt.textContent.toLowerCase().indexOf(q) < 0;
+            });
+        });
+        menu.appendChild(search);
+
+        function update() {
+            var sel = menu.querySelectorAll('input:checked');
+            btn.textContent = !sel.length ? 'All'
+                : (sel.length === 1 ? sel[0].parentNode.textContent.trim()
+                    : sel.length + ' selected');
+        }
+        function addOption(value, label) {
+            var lab = document.createElement('label');
+            lab.className = 'cp-ms-option';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'form-check-input';
+            cb.value = String(value);
+            cb.addEventListener('change', update);
+            lab.appendChild(cb);
+            lab.appendChild(document.createTextNode(' ' + label));
+            menu.appendChild(lab);
+        }
+
+        btn.addEventListener('click', function () {
+            wrap.classList.toggle('open');
+            if (wrap.classList.contains('open')) search.focus();
+        });
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) wrap.classList.remove('open');
+        });
+
+        if (cfg.options) {
+            cfg.options.forEach(function (o) {
+                addOption(o.value, o.label !== undefined ? o.label : String(o.value));
+            });
+        } else if (cfg.sql) {
+            FB.queryAsync(cfg.sql).then(function (rows) {
+                var displayFields = cfg.display ? cfg.display.split(',') : null;
+                (rows || []).forEach(function (row) {
+                    var label = displayFields
+                        ? displayFields.map(function (f) { return row[f.trim()]; }).join(', ')
+                        : row[cfg.value];
+                    addOption(row[cfg.value], label);
+                });
+            }).catch(function (err) {
+                console.error('CloudPages: failed to load options for ' + key + ':', err);
+            });
+        }
+        return wrap;
+    }
+
     // --- Dropdown ---
     registerRenderer('dropdown', {
         render: function (key, cfg) {
+            if (cfg.mode === 'multi') return renderMultiDropdown(key, cfg);
             var select = document.createElement('select');
             select.className = 'form-select';
             select.id = key;
-            if (cfg.mode === 'multi') select.multiple = true;
 
             // Default placeholder option
             var placeholder = document.createElement('option');
@@ -251,19 +347,20 @@
             placeholder.selected = true;
             select.appendChild(placeholder);
 
-            // Load options from SQL if provided
-            if (cfg.sql) {
+            // Static option list, or options loaded from SQL
+            if (cfg.options) {
+                cfg.options.forEach(function (o) {
+                    var opt = document.createElement('option');
+                    opt.value = String(o.value);
+                    opt.textContent = o.label !== undefined ? o.label : String(o.value);
+                    if (cfg.default !== undefined && String(cfg.default) === String(o.value)) {
+                        placeholder.selected = false;
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                });
+            } else if (cfg.sql) {
                 loadDropdownOptions(select, cfg);
-            }
-
-            if (cfg.mode === 'multi') {
-                var helper = document.createElement('small');
-                helper.className = 'form-text text-muted';
-                helper.textContent = 'Ctrl+click to multi-select';
-                var container = document.createElement('div');
-                container.appendChild(select);
-                container.appendChild(helper);
-                return container;
             }
 
             return select;
@@ -272,9 +369,9 @@
             var el = document.getElementById(key);
             if (!el) return undefined;
             if (cfg && cfg.mode === 'multi') {
-                return Array.from(el.selectedOptions)
-                    .map(function (o) { return o.value; })
-                    .filter(function (v) { return v !== ''; });
+                return Array.prototype.map.call(
+                    el.querySelectorAll('.cp-ms-menu input:checked'),
+                    function (cb) { return cb.value; });
             }
             return el.value !== '' ? el.value : undefined;
         }
@@ -443,6 +540,142 @@
         }
     }
 
+    // --- Relative date presets (date ranges only) ---
+    // Mirrors Fishbowl's report-dialog relative dates: picking a preset fills
+    // the from/to inputs; editing either input switches back to Custom.
+    // Weeks start on Sunday, matching Fishbowl.
+
+    // Preset list matches Fishbowl's UtilDateRange (2025.11) plus the
+    // composable last_n/next_n entries. Grouped for the <optgroup> UI.
+    var DATE_PRESET_GROUPS = [
+        { label: '', items: [
+            { key: 'custom', label: 'Custom' },
+            { key: 'all', label: 'All' },
+            { key: 'today', label: 'Today' },
+            { key: 'yesterday', label: 'Yesterday' }
+        ] },
+        { label: 'Weeks', items: [
+            { key: 'this_week', label: 'This Week' },
+            { key: 'this_week_td', label: 'This Week-to-date' },
+            { key: 'last_week', label: 'Last Week' },
+            { key: 'last_week_td', label: 'Last Week-to-date' },
+            { key: 'next_week', label: 'Next Week' },
+            { key: 'next_4_weeks', label: 'Next 4 Weeks' }
+        ] },
+        { label: 'Months', items: [
+            { key: 'this_month', label: 'This Month' },
+            { key: 'this_month_td', label: 'This Month-to-date' },
+            { key: 'last_month', label: 'Last Month' },
+            { key: 'last_month_td', label: 'Last Month-to-date' },
+            { key: 'next_month', label: 'Next Month' }
+        ] },
+        { label: 'Quarters', items: [
+            { key: 'this_quarter', label: 'This Quarter' },
+            { key: 'this_quarter_td', label: 'This Quarter-to-date' },
+            { key: 'last_quarter', label: 'Last Quarter' },
+            { key: 'last_quarter_td', label: 'Last Quarter-to-date' },
+            { key: 'next_quarter', label: 'Next Quarter' }
+        ] },
+        { label: 'Years', items: [
+            { key: 'this_year', label: 'This Year' },
+            { key: 'this_year_td', label: 'This Year-to-date' },
+            { key: 'last_year', label: 'Last Year' },
+            { key: 'last_year_td', label: 'Last Year-to-date' },
+            { key: 'next_year', label: 'Next Year' }
+        ] },
+        { label: 'Rolling', items: [
+            { key: 'last_30', label: 'Last 30 Days' },
+            { key: 'last_365', label: 'Last 365 Days' },
+            { key: 'next_30', label: 'Next 30 Days' },
+            { key: 'next_365', label: 'Next 365 Days' },
+            { key: 'last_n', label: 'Last N…' },
+            { key: 'next_n', label: 'Next N…' }
+        ] }
+    ];
+
+    function _isoDate(d) {
+        var mm = String(d.getMonth() + 1);
+        var dd = String(d.getDate());
+        return d.getFullYear() + '-' + (mm.length < 2 ? '0' + mm : mm) + '-' + (dd.length < 2 ? '0' + dd : dd);
+    }
+
+    /**
+     * Resolve a preset key to {start, end} ISO date strings. 'all' returns
+     * {start: '', end: ''} (clears the filter). last_n/next_n take the count
+     * and unit ('days'|'weeks'|'months'|'quarters'|'years') as extra args:
+     * rolling windows anchored on today (inclusive).
+     * Weeks start Sunday; quarters are calendar quarters — both match
+     * Fishbowl's UtilDateRange.
+     */
+    function presetDates(preset, n, unit) {
+        var now = new Date();
+        var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var y = today.getFullYear(), m = today.getMonth(), q = Math.floor(m / 3);
+        var weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        function addDays(base, days) { var d = new Date(base); d.setDate(d.getDate() + days); return d; }
+        var start = null, end = null;
+        switch (preset) {
+            case 'all': return { start: '', end: '' };
+            case 'today': start = end = today; break;
+            case 'yesterday': start = end = addDays(today, -1); break;
+
+            case 'this_week': start = weekStart; end = addDays(weekStart, 6); break;
+            case 'this_week_td': start = weekStart; end = today; break;
+            case 'last_week': start = addDays(weekStart, -7); end = addDays(weekStart, -1); break;
+            case 'last_week_td': start = addDays(weekStart, -7); end = addDays(weekStart, -7 + today.getDay()); break;
+            case 'next_week': start = addDays(weekStart, 7); end = addDays(weekStart, 13); break;
+            case 'next_4_weeks': start = addDays(weekStart, 7); end = addDays(weekStart, 7 + 27); break;
+
+            case 'this_month': start = new Date(y, m, 1); end = new Date(y, m + 1, 0); break;
+            case 'this_month_td': start = new Date(y, m, 1); end = today; break;
+            case 'last_month': start = new Date(y, m - 1, 1); end = new Date(y, m, 0); break;
+            case 'last_month_td':
+                start = new Date(y, m - 1, 1);
+                end = new Date(y, m - 1, Math.min(today.getDate(), new Date(y, m, 0).getDate())); break;
+            case 'next_month': start = new Date(y, m + 1, 1); end = new Date(y, m + 2, 0); break;
+
+            case 'this_quarter': start = new Date(y, q * 3, 1); end = new Date(y, q * 3 + 3, 0); break;
+            case 'this_quarter_td': start = new Date(y, q * 3, 1); end = today; break;
+            case 'last_quarter': start = new Date(y, (q - 1) * 3, 1); end = new Date(y, q * 3, 0); break;
+            case 'last_quarter_td':
+                start = new Date(y, (q - 1) * 3, 1);
+                end = new Date(y, (q - 1) * 3 + (m - q * 3), today.getDate()); break;
+            case 'next_quarter': start = new Date(y, (q + 1) * 3, 1); end = new Date(y, (q + 2) * 3, 0); break;
+
+            case 'this_year': start = new Date(y, 0, 1); end = new Date(y, 11, 31); break;
+            case 'this_year_td': start = new Date(y, 0, 1); end = today; break;
+            case 'last_year': start = new Date(y - 1, 0, 1); end = new Date(y - 1, 11, 31); break;
+            case 'last_year_td': start = new Date(y - 1, 0, 1); end = new Date(y - 1, m, today.getDate()); break;
+            case 'next_year': start = new Date(y + 1, 0, 1); end = new Date(y + 1, 11, 31); break;
+
+            case 'last_30': start = addDays(today, -29); end = today; break;
+            case 'last_365': start = addDays(today, -364); end = today; break;
+            case 'next_30': start = today; end = addDays(today, 29); break;
+            case 'next_365': start = today; end = addDays(today, 364); break;
+
+            case 'last_n': case 'next_n': {
+                n = parseInt(n, 10);
+                if (!n || n < 1) return null;
+                var back = preset === 'last_n';
+                var edge;
+                switch (unit) {
+                    case 'weeks': edge = addDays(today, back ? -(7 * n - 1) : 7 * n - 1); break;
+                    case 'months': edge = addDays(new Date(y, m + (back ? -n : n), today.getDate()), back ? 1 : -1); break;
+                    case 'quarters': edge = addDays(new Date(y, m + 3 * (back ? -n : n), today.getDate()), back ? 1 : -1); break;
+                    case 'years': edge = addDays(new Date(y + (back ? -n : n), m, today.getDate()), back ? 1 : -1); break;
+                    default: edge = addDays(today, back ? -(n - 1) : n - 1); break;
+                }
+                start = back ? edge : today;
+                end = back ? today : edge;
+                break;
+            }
+            default: return null;
+        }
+        return { start: _isoDate(start), end: _isoDate(end) };
+    }
+
+    CloudPages.presetDates = presetDates;
+
     // --- Range input helper ---
     function renderRangeInput(key, type, attrs) {
         var group = document.createElement('div');
@@ -467,7 +700,71 @@
         group.appendChild(start);
         group.appendChild(divider);
         group.appendChild(end);
-        return group;
+
+        if (type !== 'date') return group;
+
+        // Date ranges get a relative-date preset picker above the inputs.
+        var wrap = document.createElement('div');
+        var preset = document.createElement('select');
+        preset.className = 'form-select form-select-sm cp-range-preset';
+        preset.id = key + '_preset';
+        DATE_PRESET_GROUPS.forEach(function (g) {
+            var parent = preset;
+            if (g.label) {
+                parent = document.createElement('optgroup');
+                parent.label = g.label;
+                preset.appendChild(parent);
+            }
+            g.items.forEach(function (p) {
+                var opt = document.createElement('option');
+                opt.value = p.key;
+                opt.textContent = p.label;
+                parent.appendChild(opt);
+            });
+        });
+
+        // "Last N… / Next N…" composer: count + unit, shown only when chosen.
+        var composer = document.createElement('div');
+        composer.className = 'cp-range-composer';
+        composer.hidden = true;
+        var count = document.createElement('input');
+        count.type = 'number';
+        count.min = '1';
+        count.value = '7';
+        count.className = 'form-control form-control-sm';
+        count.id = key + '_preset_n';
+        var unit = document.createElement('select');
+        unit.className = 'form-select form-select-sm';
+        unit.id = key + '_preset_unit';
+        ['days', 'weeks', 'months', 'quarters', 'years'].forEach(function (u) {
+            var opt = document.createElement('option');
+            opt.value = u;
+            opt.textContent = u.charAt(0).toUpperCase() + u.slice(1);
+            unit.appendChild(opt);
+        });
+        composer.appendChild(count);
+        composer.appendChild(unit);
+
+        function applyPreset() {
+            var range = presetDates(preset.value, count.value, unit.value);
+            if (!range) return;
+            start.value = range.start;
+            end.value = range.end;
+        }
+        preset.addEventListener('change', function () {
+            composer.hidden = preset.value !== 'last_n' && preset.value !== 'next_n';
+            applyPreset();
+        });
+        count.addEventListener('input', applyPreset);
+        unit.addEventListener('change', applyPreset);
+        function toCustom() { preset.value = 'custom'; composer.hidden = true; }
+        start.addEventListener('input', toCustom);
+        end.addEventListener('input', toCustom);
+
+        wrap.appendChild(preset);
+        wrap.appendChild(composer);
+        wrap.appendChild(group);
+        return wrap;
     }
 
     function getRangeValue(key) {
@@ -483,8 +780,29 @@
     // [5] Parameter Form
     // ═══════════════════════════════════════════════════════════════════
 
-    function renderParameters(parameters, container) {
+    // The engine renders parameters inside a collapsible "Parameters" panel
+    // (a <details> with a caret) so every report gets the same experience:
+    // open on load, auto-collapsed after a successful run, reopened by click.
+    // Disable with "collapsible_parameters": false; retitle with
+    // "parameters_label".
+    function renderParameters(parameters, container, settings) {
+        settings = settings || {};
         container.innerHTML = '';
+
+        var fields = container;
+        if (settings.collapsible_parameters !== false) {
+            var panel = document.createElement('details');
+            panel.className = 'cp-param-panel';
+            panel.open = true;
+            var summary = document.createElement('summary');
+            summary.className = 'cp-param-summary';
+            summary.textContent = settings.parameters_label || 'Parameters';
+            panel.appendChild(summary);
+            fields = document.createElement('div');
+            fields.className = 'cp-param-fields';
+            panel.appendChild(fields);
+            container.appendChild(panel);
+        }
 
         Object.keys(parameters).forEach(function (key) {
             var cfg = parameters[key];
@@ -492,6 +810,7 @@
 
             var formGroup = document.createElement('div');
             formGroup.className = 'mb-3';
+            if (cfg.mode === 'range') formGroup.className += ' cp-span-2';
 
             var label = document.createElement('label');
             label.className = 'form-label';
@@ -514,7 +833,7 @@
             errorEl.id = key + '_error';
             formGroup.appendChild(errorEl);
 
-            container.appendChild(formGroup);
+            fields.appendChild(formGroup);
         });
     }
 
@@ -604,7 +923,11 @@
 
     function formatDate(val) {
         if (!val) return '';
-        var d = new Date(val);
+        // Parse date-only strings as local time: new Date('2026-07-08') is UTC
+        // midnight, which toLocaleDateString() renders as the previous day in
+        // timezones west of UTC.
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(val).trim());
+        var d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(val);
         return isNaN(d.getTime()) ? val : d.toLocaleDateString();
     }
 
@@ -646,14 +969,22 @@
 
         _lastResultRows = rows;
 
-        // Build column definitions from result keys
-        var allKeys = Object.keys(rows[0]);
+        // Build column definitions from the union of all row keys — rows from
+        // SQL are uniform, but demo/JSON rows may omit keys per row.
+        var keySet = {};
+        var allKeys = [];
+        rows.forEach(function (row) {
+            Object.keys(row).forEach(function (k) {
+                if (!keySet[k]) { keySet[k] = true; allKeys.push(k); }
+            });
+        });
         var dtColumns = allKeys.map(function (key) {
             var colCfg = columns[key] || {};
             var def = {
                 data: key,
                 title: colCfg.label || snakeToTitle(key),
-                visible: colCfg.visible !== false
+                visible: colCfg.visible !== false,
+                defaultContent: ''
             };
             if (colCfg.width) def.width = colCfg.width;
             var renderFn = columnRenderFn(colCfg, settings);
@@ -668,19 +999,144 @@
         container.appendChild(table);
 
         // Initialize DataTable
-        _dataTableInstance = $(table).DataTable({
+        var dtConfig = {
             data: rows,
             columns: dtColumns,
             pageLength: settings.page_length || 25,
             order: [],
             autoWidth: true,
             responsive: true
-        });
+        };
+
+        // Runtime column show/hide via the DataTables Buttons ColVis extension
+        // (settings.column_toggles). Requires the Buttons extension vendored;
+        // degrades silently to a plain table when absent.
+        var hasButtons = settings.column_toggles && $.fn.dataTable.Buttons;
+        if (hasButtons) {
+            dtConfig.buttons = [{ extend: 'colvis', text: 'Columns' }];
+        }
+
+        // One toolbar row above the table: [Columns] [Show N entries] left,
+        // search right; info + paging share a row below.
+        dtConfig.dom =
+            "<'cp-table-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2'" +
+            "<'d-flex align-items-center gap-2'" + (hasButtons ? 'Bl' : 'l') + ">f>" +
+            "rt" +
+            "<'d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2'ip>";
+
+        // Grouped rows with per-group subtotals (settings.group_by +
+        // settings.group_totals). Requires the RowGroup extension vendored.
+        if (settings.group_by && $.fn.dataTable.RowGroup) {
+            var groupKey = settings.group_by;
+            var totalKeys = settings.group_totals || [];
+            var keyIndex = {};
+            allKeys.forEach(function (k, i) { keyIndex[k] = i; });
+            dtConfig.orderFixed = [[keyIndex[groupKey] || 0, 'asc']];
+            dtConfig.rowGroup = {
+                dataSrc: groupKey,
+                startRender: function (groupRows, group) {
+                    return group + ' (' + groupRows.count() + ')';
+                },
+                endRender: totalKeys.length ? function (groupRows) {
+                    var totals = {};
+                    totalKeys.forEach(function (k) { totals[k] = 0; });
+                    groupRows.data().each(function (row) {
+                        totalKeys.forEach(function (k) {
+                            var n = parseFloat(row[k]);
+                            if (!isNaN(n)) totals[k] += n;
+                        });
+                    });
+                    // Runs on every draw: read the CURRENT column visibility
+                    // so runtime column toggles keep the totals row aligned.
+                    var visible = groupRows.table().columns().visible().toArray();
+                    var firstVisible = visible.indexOf(true);
+                    var tr = document.createElement('tr');
+                    allKeys.forEach(function (k, i) {
+                        if (!visible[i]) return;
+                        var td = document.createElement('td');
+                        if (totals[k] !== undefined) {
+                            var renderFn = columnRenderFn(columns[k], settings);
+                            td.textContent = renderFn ? renderFn(totals[k]) : formatNumber(totals[k], settings.qty_unit_format);
+                            td.style.fontWeight = '600';
+                        } else if (i === firstVisible) {
+                            td.textContent = 'Total';
+                            td.style.fontWeight = '600';
+                        }
+                        tr.appendChild(td);
+                    });
+                    return tr;
+                } : null
+            };
+        }
+
+        _dataTableInstance = $(table).DataTable(dtConfig);
+
+        // Toggling a column adjusts data-row cells in place without a draw,
+        // so RowGroup's header/totals rows keep their old cell layout. Force
+        // a draw so groups re-render against the new visibility.
+        if (dtConfig.rowGroup) {
+            _dataTableInstance.on('column-visibility.dt', function () {
+                _dataTableInstance.draw(false);
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // [7] Export Engine
     // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Build the export workbook, applying column formats from the columns
+     * config: 'date' columns become real date cells (typed, mm/dd/yyyy),
+     * 'currency'/'number'/'percent' become numeric cells with number formats —
+     * so Excel can sort, filter, and pivot them natively.
+     */
+    function buildWorkbook(rows) {
+        var columns = (_config && _config.columns) || {};
+        var data = rows.map(function (row) {
+            var out = {};
+            Object.keys(row).forEach(function (k) {
+                var fmt = (columns[k] || {}).format;
+                var v = row[k];
+                if (v !== null && v !== undefined && v !== '') {
+                    if (fmt === 'date') {
+                        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+                        if (m) v = new Date(+m[1], +m[2] - 1, +m[3]);
+                        else if (!isNaN(new Date(v).getTime())) v = new Date(v);
+                    } else if (fmt === 'currency' || fmt === 'number' || fmt === 'percent') {
+                        var n = parseFloat(v);
+                        if (!isNaN(n)) v = n;
+                    }
+                }
+                out[k] = v;
+            });
+            return out;
+        });
+        var ws = XLSX.utils.json_to_sheet(data, { cellDates: true });
+        // Number formats per column
+        if (data.length) {
+            var keys = Object.keys(data[0]);
+            var range = XLSX.utils.decode_range(ws['!ref']);
+            keys.forEach(function (k, c) {
+                var fmt = (columns[k] || {}).format;
+                var z = fmt === 'date' ? 'mm/dd/yyyy'
+                    : fmt === 'currency' ? '$#,##0.00'
+                    : fmt === 'number' ? '#,##0.00'
+                    : fmt === 'percent' ? '0.00%'
+                    : null;
+                if (!z) return;
+                for (var r = range.s.r + 1; r <= range.e.r; r++) {
+                    var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+                    if (cell && (cell.t === 'n' || cell.t === 'd')) cell.z = z;
+                }
+            });
+        }
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        return wb;
+    }
+
+    CloudPages.buildWorkbook = buildWorkbook;
 
     function exportXLSX(rows, filename) {
         if (typeof XLSX === 'undefined') {
@@ -688,9 +1144,7 @@
             return;
         }
         var data = CloudPages.hooks.onExport(rows, 'xlsx');
-        var ws = XLSX.utils.json_to_sheet(data);
-        var wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        var wb = buildWorkbook(data);
 
         if (FB.isJXBrowser) {
             var b64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
@@ -745,7 +1199,12 @@
         sql = hooked.sql;
         values = hooked.params;
 
-        var bound = bindParams(sql, values);
+        // Demo mode: keep the original SQL text (so the DemoAdapter can match
+        // it to the #query tag) and pass raw values — arrays and ranges intact
+        // for the generated demo filter (see Demo Mode section).
+        var bound = FB.isDemo
+            ? { sql: sql, bindings: values }
+            : bindParams(pruneOptionalClauses(sql, values), values);
 
         FB.setStatus('Running query...');
         FB.setProgress(-1);
@@ -764,7 +1223,109 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // [9] Lifecycle / Init
+    // [9] Demo Mode
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Outside JXBrowser, demo data makes the full report work in a plain
+    // browser (parameter dropdowns, filtered results, export). Sources:
+    //   1. Inline <script id="demo" type="application/json"> (wins if both)
+    //   2. settings.demo_data — path to a JSON file, fetched lazily so
+    //      production pages never load or parse demo rows.
+    // JSON shape:
+    //   { "query": [row, ...],                     result rows for the report
+    //     "parameters": { "<name>": [row, ...] },  rows for SQL-driven params
+    //     "user": {...}, "context": {...} }        optional fb.js demo extras
+    // Result filtering mirrors the SQL WHERE clause: each parameter filters
+    // the demo-row column named by its `demo_column` (default: the parameter
+    // name), using predicates derived from the parameter type/mode.
+
+    function setupDemoMode(config) {
+        if (FB.isJXBrowser) return Promise.resolve(false);
+
+        var inline = document.getElementById('demo');
+        var loaded;
+        if (inline) {
+            try {
+                loaded = Promise.resolve(JSON.parse(inline.textContent.trim()));
+            } catch (e) {
+                loaded = Promise.reject(new Error('<script id="demo"> has invalid JSON: ' + e.message));
+            }
+        } else if (config.settings.demo_data) {
+            loaded = fetch(config.settings.demo_data).then(function (res) {
+                if (!res.ok) throw new Error('demo_data fetch failed: HTTP ' + res.status);
+                return res.json();
+            });
+        } else {
+            return Promise.resolve(false);
+        }
+
+        return loaded.then(function (demo) {
+            var queries = {};
+            Object.keys(config.parameters).forEach(function (name) {
+                var cfg = config.parameters[name];
+                if (cfg.sql && demo.parameters && demo.parameters[name]) {
+                    queries[cfg.sql.trim()] = demo.parameters[name];
+                }
+            });
+            queries[config.query.trim()] = makeDemoQueryFn(demo.query || [], config.parameters);
+            FB.configure({
+                environment: 'demo',
+                demoData: { queries: queries, user: demo.user, context: demo.context }
+            });
+            return true;
+        });
+    }
+
+    function makeDemoQueryFn(rows, parameters) {
+        return function (params) {
+            return rows.filter(function (row) {
+                return Object.keys(parameters).every(function (name) {
+                    var cfg = parameters[name];
+                    // Params that shape the SQL but don't filter rows
+                    // (e.g. a date-column selector) opt out of demo filtering.
+                    if (cfg.demo_filter === false) return true;
+                    var cell = row[cfg.demo_column || name];
+                    if (cfg.mode === 'range') {
+                        return demoInRange(cell, params[name + '_start'], params[name + '_end'], cfg.type);
+                    }
+                    var val = params[name];
+                    if (val === undefined || val === null || val === '' ||
+                        (Array.isArray(val) && !val.length)) return true;
+                    if (Array.isArray(val)) {
+                        return val.some(function (v) { return String(cell) === String(v); });
+                    }
+                    if (cfg.type === 'checkbox') {
+                        return !val || cell === true || cell === 1 || cell === '1' || cell === 'true';
+                    }
+                    if (cfg.type === 'string') {
+                        return String(cell == null ? '' : cell).toLowerCase()
+                            .indexOf(String(val).toLowerCase()) >= 0;
+                    }
+                    return String(cell) === String(val);
+                });
+            });
+        };
+    }
+
+    function demoInRange(cell, start, end, type) {
+        if (!start && !end) return true;
+        if (cell === undefined || cell === null) return false;
+        if (type === 'int' || type === 'decimal') {
+            var n = parseFloat(cell);
+            if (start && n < parseFloat(start)) return false;
+            if (end && n > parseFloat(end)) return false;
+            return true;
+        }
+        // date/time/timestamp: ISO strings compare lexicographically; compare
+        // only the bound's own length so a date bound matches timestamp cells.
+        var s = String(cell);
+        if (start && s.slice(0, String(start).length) < String(start)) return false;
+        if (end && s.slice(0, String(end).length) > String(end)) return false;
+        return true;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // [10] Lifecycle / Init
     // ═══════════════════════════════════════════════════════════════════
 
     function init() {
@@ -775,9 +1336,21 @@
             return;
         }
 
+        // Demo setup must finish before the UI renders: SQL-driven parameters
+        // (dropdowns) query as soon as they render.
+        setupDemoMode(config).then(function () {
+            initUI(config);
+        }).catch(function (e) {
+            console.error('CloudPages: demo setup failed:', e.message);
+            var container = document.getElementById('tableContainer');
+            if (container) container.innerHTML = '<p class="text-danger">Demo data failed to load: ' + (e.message || e) + '</p>';
+        });
+    }
+
+    function initUI(config) {
         var paramContainer = document.getElementById('parametersContainer');
         if (paramContainer) {
-            renderParameters(config.parameters, paramContainer);
+            renderParameters(config.parameters, paramContainer, config.settings);
         }
 
         // Submit button
@@ -795,6 +1368,8 @@
                         return;
                     }
                     renderTable(rows, config.columns, config.settings);
+                    var panel = document.querySelector('.cp-param-panel');
+                    if (panel) panel.open = false;
                 });
             });
         }
@@ -823,7 +1398,7 @@
     document.addEventListener('DOMContentLoaded', init);
 
     // ═══════════════════════════════════════════════════════════════════
-    // [10] Public API
+    // [11] Public API
     // ═══════════════════════════════════════════════════════════════════
 
     CloudPages.init = init;
