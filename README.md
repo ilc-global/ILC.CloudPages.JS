@@ -77,7 +77,7 @@ That's it. No JavaScript to write — cloudpages.js reads the config and wires e
 | `parameters_label` | string | `"Parameters"` | Heading of the collapsible panel |
 | `column_toggles` | boolean | `false` | Runtime show/hide-columns button (requires the DataTables Buttons+ColVis extension vendored) |
 | `group_by` | string | — | Group rows by this column key (requires the DataTables RowGroup extension vendored) |
-| `group_totals` | string[] | — | Column keys subtotaled per group. Note: subtotal-row cell alignment assumes the initial column visibility; combining with runtime column toggles can misalign the totals row |
+| `group_totals` | string[] | — | Column keys subtotaled per group; the totals row tracks runtime column visibility |
 
 Dropdown parameters accept a static `options` array (`[{ "value": "10", "label": "Entered" }, …]`) as an alternative to `sql`-loaded options; `default` pre-selects by value.
 

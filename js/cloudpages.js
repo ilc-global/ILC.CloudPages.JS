@@ -1029,15 +1029,19 @@
                             if (!isNaN(n)) totals[k] += n;
                         });
                     });
+                    // Runs on every draw: read the CURRENT column visibility
+                    // so runtime column toggles keep the totals row aligned.
+                    var visible = groupRows.table().columns().visible().toArray();
+                    var firstVisible = visible.indexOf(true);
                     var tr = document.createElement('tr');
                     allKeys.forEach(function (k, i) {
-                        if (dtColumns[i].visible === false) return;
+                        if (!visible[i]) return;
                         var td = document.createElement('td');
                         if (totals[k] !== undefined) {
                             var renderFn = columnRenderFn(columns[k], settings);
                             td.textContent = renderFn ? renderFn(totals[k]) : formatNumber(totals[k], settings.qty_unit_format);
                             td.style.fontWeight = '600';
-                        } else if (i === 0 || k === groupKey) {
+                        } else if (i === firstVisible) {
                             td.textContent = 'Total';
                             td.style.fontWeight = '600';
                         }
@@ -1049,6 +1053,15 @@
         }
 
         _dataTableInstance = $(table).DataTable(dtConfig);
+
+        // Toggling a column adjusts data-row cells in place without a draw,
+        // so RowGroup's header/totals rows keep their old cell layout. Force
+        // a draw so groups re-render against the new visibility.
+        if (dtConfig.rowGroup) {
+            _dataTableInstance.on('column-visibility.dt', function () {
+                _dataTableInstance.draw(false);
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
