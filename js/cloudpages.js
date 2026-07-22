@@ -500,8 +500,29 @@
     // [5] Parameter Form
     // ═══════════════════════════════════════════════════════════════════
 
-    function renderParameters(parameters, container) {
+    // The engine renders parameters inside a collapsible "Parameters" panel
+    // (a <details> with a caret) so every report gets the same experience:
+    // open on load, auto-collapsed after a successful run, reopened by click.
+    // Disable with "collapsible_parameters": false; retitle with
+    // "parameters_label".
+    function renderParameters(parameters, container, settings) {
+        settings = settings || {};
         container.innerHTML = '';
+
+        var fields = container;
+        if (settings.collapsible_parameters !== false) {
+            var panel = document.createElement('details');
+            panel.className = 'cp-param-panel';
+            panel.open = true;
+            var summary = document.createElement('summary');
+            summary.className = 'cp-param-summary';
+            summary.textContent = settings.parameters_label || 'Parameters';
+            panel.appendChild(summary);
+            fields = document.createElement('div');
+            fields.className = 'cp-param-fields';
+            panel.appendChild(fields);
+            container.appendChild(panel);
+        }
 
         Object.keys(parameters).forEach(function (key) {
             var cfg = parameters[key];
@@ -531,7 +552,7 @@
             errorEl.id = key + '_error';
             formGroup.appendChild(errorEl);
 
-            container.appendChild(formGroup);
+            fields.appendChild(formGroup);
         });
     }
 
@@ -621,7 +642,11 @@
 
     function formatDate(val) {
         if (!val) return '';
-        var d = new Date(val);
+        // Parse date-only strings as local time: new Date('2026-07-08') is UTC
+        // midnight, which toLocaleDateString() renders as the previous day in
+        // timezones west of UTC.
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(val).trim());
+        var d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(val);
         return isNaN(d.getTime()) ? val : d.toLocaleDateString();
     }
 
@@ -910,7 +935,7 @@
     function initUI(config) {
         var paramContainer = document.getElementById('parametersContainer');
         if (paramContainer) {
-            renderParameters(config.parameters, paramContainer);
+            renderParameters(config.parameters, paramContainer, config.settings);
         }
 
         // Submit button
@@ -928,6 +953,8 @@
                         return;
                     }
                     renderTable(rows, config.columns, config.settings);
+                    var panel = document.querySelector('.cp-param-panel');
+                    if (panel) panel.open = false;
                 });
             });
         }

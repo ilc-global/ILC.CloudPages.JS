@@ -72,6 +72,9 @@ That's it. No JavaScript to write — cloudpages.js reads the config and wires e
 | `enable_csv_export` | boolean | `true` | Show CSV export option |
 | `amount_unit_format` | string | `"$0.00"` | Currency format pattern |
 | `qty_unit_format` | string | `"0.00"` | Number format pattern |
+| `demo_data` | string | — | Path to a demo-data JSON file, fetched lazily outside JXBrowser (see [Demo Mode](docs/demo-mode.md)) |
+| `collapsible_parameters` | boolean | `true` | Render parameters in a collapsible panel that auto-collapses after a successful run |
+| `parameters_label` | string | `"Parameters"` | Heading of the collapsible panel |
 
 ### Parameters (`#parameters`)
 

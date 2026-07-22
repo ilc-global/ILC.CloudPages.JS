@@ -81,6 +81,9 @@ Add a `<script id="settings">` block before `</body>`:
 - `load_on_open: true` — runs the query immediately when the page loads (useful for dashboards)
 - `page_length` — rows per page in the DataTable
 - `enable_xlsx_export` / `enable_csv_export` — which export formats to offer
+- `collapsible_parameters` (default `true`) — the engine renders the parameter
+  form inside a collapsible "Parameters" panel (caret heading) that
+  auto-collapses after a successful run; `parameters_label` retitles it
 
 ### Step 3: Define Parameters
 
