@@ -270,6 +270,20 @@
         menu.className = 'cp-ms-menu';
         wrap.appendChild(menu);
 
+        // Type-to-filter box at the top of the menu — lists can hold
+        // hundreds/thousands of options (vendors, parts).
+        var search = document.createElement('input');
+        search.type = 'text';
+        search.className = 'form-control form-control-sm cp-ms-search';
+        search.placeholder = 'Type to filter…';
+        search.addEventListener('input', function () {
+            var q = search.value.toLowerCase();
+            Array.prototype.forEach.call(menu.querySelectorAll('.cp-ms-option'), function (opt) {
+                opt.hidden = q !== '' && opt.textContent.toLowerCase().indexOf(q) < 0;
+            });
+        });
+        menu.appendChild(search);
+
         function update() {
             var sel = menu.querySelectorAll('input:checked');
             btn.textContent = !sel.length ? 'All'
@@ -289,7 +303,10 @@
             menu.appendChild(lab);
         }
 
-        btn.addEventListener('click', function () { wrap.classList.toggle('open'); });
+        btn.addEventListener('click', function () {
+            wrap.classList.toggle('open');
+            if (wrap.classList.contains('open')) search.focus();
+        });
         document.addEventListener('click', function (e) {
             if (!wrap.contains(e.target)) wrap.classList.remove('open');
         });

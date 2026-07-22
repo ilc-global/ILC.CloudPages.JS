@@ -69,6 +69,10 @@
     z-index: 1050;
 }
 .cp-multiselect.open .cp-ms-menu { display: block; }
+.cp-ms-search {
+    width: calc(100% - 16px);
+    margin: 0 8px 4px;
+}
 .cp-ms-option {
     display: block;
     padding: 4px 12px;
