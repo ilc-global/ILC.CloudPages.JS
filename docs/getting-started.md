@@ -79,8 +79,15 @@ Add a `<script id="settings">` block before `</body>`:
 ```
 
 - `load_on_open: true` — runs the query immediately when the page loads (useful for dashboards)
-- `page_length` — rows per page in the DataTable
-- `enable_xlsx_export` / `enable_csv_export` — which export formats to offer
+- `page_length` — rows per page when paginating (default 100)
+- `paginate_over` — results below this count render in full with no pager;
+  at or above it the table paginates (default 100)
+- `enable_xlsx_export` / `enable_csv_export` / `enable_markdown_export` —
+  which export formats to offer (all default on)
+- `dense` — start in compact (smaller text) mode; users can toggle it with
+  the **Compact** button in the table toolbar either way
+- `theme` — `"auto"` (default, follows the OS), `"light"`, or `"dark"`
+- `title` — report title used for export filenames and metadata
 - `collapsible_parameters` (default `true`) — the engine renders the parameter
   form inside a collapsible "Parameters" panel (caret heading) that
   auto-collapses after a successful run; `parameters_label` retitles it
@@ -194,7 +201,7 @@ No JavaScript code required on your part — just HTML and JSON configuration.
 |---------|---------|
 | `<div id="parametersContainer">` | Parameter form renders here |
 | `<button id="submitButton">` | Triggers query execution |
-| `<button id="exportBtn">` | Triggers export (optional) |
+| `<button id="exportBtn">` | Placeholder the engine replaces with the export button group: **Export XLSX** and **Export CSV** split buttons (the carat opens per-format options: file name, include parameters) plus a **Markdown** button. XLSX exports include a `Parameters` sheet recording how the file was generated (disable per-export via the carat). |
 | `<div id="tableContainer">` | DataTable renders here |
 
 ## Required Script Blocks

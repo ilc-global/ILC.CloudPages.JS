@@ -6,7 +6,7 @@
  *
  * Dependencies: fb.js (loaded first), jQuery, DataTables, SheetJS (XLSX)
  *
- * @version 2.1.0
+ * @version 2.2.0
  * @license Source-Available (ILC Technology LLC)
  */
 (function (window, $) {
@@ -32,6 +32,7 @@
     var _config = null;
     var _dataTableInstance = null;
     var _lastResultRows = [];
+    var _lastRunMeta = null;   // { title, timestamp, params: [{label, value}] }
 
     function readScriptBlock(id, json) {
         var el = document.getElementById(id);
@@ -53,9 +54,13 @@
 
         // Apply defaults
         settings.load_on_open = settings.load_on_open || false;
-        settings.page_length = settings.page_length || 25;
+        settings.page_length = settings.page_length || 100;
+        settings.paginate_over = settings.paginate_over || 100;
         settings.enable_xlsx_export = settings.enable_xlsx_export !== false;
         settings.enable_csv_export = settings.enable_csv_export !== false;
+        settings.enable_markdown_export = settings.enable_markdown_export !== false;
+        settings.dense = settings.dense || false;
+        settings.theme = settings.theme || 'auto';
 
         _config = { settings: settings, parameters: parameters, query: query, columns: columns };
         return _config;
@@ -283,6 +288,25 @@
             });
         });
         menu.appendChild(search);
+
+        // Select all / none — applies to the options currently visible under
+        // the type-to-filter box, so "filter to 'ACME', select all" works.
+        var selAll = document.createElement('label');
+        selAll.className = 'cp-ms-option cp-ms-selectall';
+        var selAllCb = document.createElement('input');
+        selAllCb.type = 'checkbox';
+        selAllCb.className = 'form-check-input';
+        selAll.appendChild(selAllCb);
+        selAll.appendChild(document.createTextNode(' Select all'));
+        menu.appendChild(selAll);
+        selAllCb.addEventListener('change', function () {
+            Array.prototype.forEach.call(menu.querySelectorAll('.cp-ms-option:not(.cp-ms-selectall)'), function (opt) {
+                if (opt.hidden) return;
+                var cb = opt.querySelector('input');
+                if (cb) cb.checked = selAllCb.checked;
+            });
+            update();
+        });
 
         function update() {
             var sel = menu.querySelectorAll('input:checked');
@@ -890,6 +914,52 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // [5b] Parameter Summary (human-readable values for export metadata)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // One {label, value} entry per parameter, using what the USER saw:
+    // dropdown option labels (not raw ids), "start to end" for ranges,
+    // Yes/No for checkboxes, "All" for anything left empty.
+    function parameterSummary(parameters) {
+        return Object.keys(parameters).map(function (key) {
+            var cfg = parameters[key];
+            var label = cfg.label || snakeToTitle(key);
+            var value;
+            if (cfg.mode === 'range') {
+                var startEl = document.getElementById(key + '_start');
+                var endEl = document.getElementById(key + '_end');
+                var st = startEl ? startEl.value : '', en = endEl ? endEl.value : '';
+                var presetEl = document.getElementById(key + '_preset');
+                var presetTxt = presetEl && presetEl.value !== 'custom' && presetEl.selectedIndex >= 0
+                    ? presetEl.options[presetEl.selectedIndex].textContent : null;
+                value = (!st && !en) ? 'All'
+                    : (st || '…') + ' to ' + (en || '…') + (presetTxt ? ' (' + presetTxt + ')' : '');
+            } else if (cfg.type === 'checkbox') {
+                var cb = document.getElementById(key);
+                value = cb && cb.checked ? 'Yes' : 'No';
+            } else if (cfg.type === 'dropdown' && cfg.mode === 'multi') {
+                var wrap = document.getElementById(key);
+                var sel = wrap ? wrap.querySelectorAll('.cp-ms-menu .cp-ms-option:not(.cp-ms-selectall) input:checked') : [];
+                value = !sel.length ? 'All'
+                    : Array.prototype.map.call(sel, function (c) { return c.parentNode.textContent.trim(); }).join(', ');
+            } else if (cfg.type === 'dropdown') {
+                var selEl = document.getElementById(key);
+                value = (selEl && selEl.value !== '' && selEl.selectedIndex >= 0)
+                    ? selEl.options[selEl.selectedIndex].textContent : 'All';
+            } else if (cfg.type === 'autocomplete') {
+                var ac = document.getElementById(key);
+                value = ac && ac.value ? ac.value : 'All';
+            } else {
+                var el = document.getElementById(key);
+                value = el && el.value !== '' ? el.value : 'All';
+            }
+            return { label: label, value: value };
+        });
+    }
+
+    CloudPages.parameterSummary = parameterSummary;
+
+    // ═══════════════════════════════════════════════════════════════════
     // [6] Table Renderer (DataTables)
     // ═══════════════════════════════════════════════════════════════════
 
@@ -998,11 +1068,17 @@
         table.className = 'table table-striped table-hover';
         container.appendChild(table);
 
+        // Pagination: small result sets render whole (computers are fast);
+        // beyond settings.paginate_over (default 100) paginate at
+        // settings.page_length (default 100) per page.
+        var paginate = rows.length >= (settings.paginate_over || 100);
+
         // Initialize DataTable
         var dtConfig = {
             data: rows,
             columns: dtColumns,
-            pageLength: settings.page_length || 25,
+            paging: paginate,
+            pageLength: paginate ? (settings.page_length || 100) : -1,
             order: [],
             autoWidth: true,
             responsive: true
@@ -1018,9 +1094,10 @@
 
         // One toolbar row above the table: [Columns] [Show N entries] left,
         // search right; info + paging share a row below.
+        var lengthCtl = paginate ? 'l' : '';
         dtConfig.dom =
             "<'cp-table-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2'" +
-            "<'d-flex align-items-center gap-2'" + (hasButtons ? 'Bl' : 'l') + ">f>" +
+            "<'d-flex align-items-center gap-2'" + (hasButtons ? 'B' : '') + lengthCtl + ">f>" +
             "rt" +
             "<'d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2'ip>";
 
@@ -1071,6 +1148,25 @@
 
         _dataTableInstance = $(table).DataTable(dtConfig);
 
+        // Dense (compact) mode: smaller text + tighter cells for scanning many
+        // rows at once. Toggle button lives in the table toolbar; preference
+        // persists where storage is available (data: URLs throw — ignore).
+        applyDense(currentDense(settings));
+        var toolbar = container.querySelector('.cp-table-toolbar > div');
+        if (toolbar) {
+            var denseBtn = document.createElement('button');
+            denseBtn.type = 'button';
+            denseBtn.className = 'btn btn-sm btn-outline-secondary cp-dense-toggle';
+            denseBtn.textContent = 'Compact';
+            denseBtn.title = 'Toggle compact (smaller text) mode';
+            denseBtn.addEventListener('click', function () {
+                var on = !document.body.classList.contains('cp-dense');
+                applyDense(on);
+                try { localStorage.setItem('cp-dense', on ? '1' : '0'); } catch (e) { /* no storage */ }
+            });
+            toolbar.appendChild(denseBtn);
+        }
+
         // Toggling a column adjusts data-row cells in place without a draw,
         // so RowGroup's header/totals rows keep their old cell layout. Force
         // a draw so groups re-render against the new visibility.
@@ -1080,6 +1176,46 @@
             });
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // [6b] Dense mode + Theme
+    // ═══════════════════════════════════════════════════════════════════
+
+    function currentDense(settings) {
+        try {
+            var saved = localStorage.getItem('cp-dense');
+            if (saved === '1') return true;
+            if (saved === '0') return false;
+        } catch (e) { /* data: URL / private mode */ }
+        return !!(settings && settings.dense);
+    }
+    function applyDense(on) {
+        document.body.classList.toggle('cp-dense', !!on);
+        var btn = document.querySelector('.cp-dense-toggle');
+        if (btn) btn.classList.toggle('active', !!on);
+    }
+    CloudPages.setDense = applyDense;
+
+    // Theme: settings.theme 'auto' | 'light' | 'dark'. Bootstrap 5.3 does the
+    // heavy lifting via data-bs-theme. 'auto' follows the OS; if fb.js ever
+    // exposes the Fishbowl client theme (FB.getClientTheme), it wins.
+    function applyTheme(mode) {
+        var root = document.documentElement;
+        function set(dark) { root.setAttribute('data-bs-theme', dark ? 'dark' : 'light'); }
+        if (mode === 'dark') return set(true);
+        if (mode === 'light') return set(false);
+        // auto
+        if (typeof FB !== 'undefined' && typeof FB.getClientTheme === 'function') {
+            try {
+                var t = FB.getClientTheme();
+                if (t === 'dark' || t === 'light') return set(t === 'dark');
+            } catch (e) { /* fall through to OS preference */ }
+        }
+        var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+        set(!!(mq && mq.matches));
+        if (mq && mq.addEventListener) mq.addEventListener('change', function (e) { set(e.matches); });
+    }
+    CloudPages.applyTheme = applyTheme;
 
     // ═══════════════════════════════════════════════════════════════════
     // [7] Export Engine
@@ -1136,15 +1272,35 @@
         return wb;
     }
 
+    // Second sheet recording how the file was generated — the fastest support
+    // triage there is ("you picked the FUTURE 7 months"). Skipped only when
+    // the export options explicitly turn it off.
+    function appendParametersSheet(wb) {
+        if (!_lastRunMeta) return;
+        var aoa = [
+            ['Report', _lastRunMeta.title],
+            ['Generated', _lastRunMeta.timestamp],
+            ['Rows', String(_lastResultRows.length)],
+            [],
+            ['Parameter', 'Value']
+        ];
+        _lastRunMeta.params.forEach(function (pr) { aoa.push([pr.label, pr.value]); });
+        var ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{ wch: 28 }, { wch: 48 }];
+        XLSX.utils.book_append_sheet(wb, ws, 'Parameters');
+    }
+
     CloudPages.buildWorkbook = buildWorkbook;
 
-    function exportXLSX(rows, filename) {
+    function exportXLSX(rows, filename, opts) {
         if (typeof XLSX === 'undefined') {
             console.error('CloudPages: SheetJS (XLSX) not loaded.');
             return;
         }
+        opts = opts || {};
         var data = CloudPages.hooks.onExport(rows, 'xlsx');
         var wb = buildWorkbook(data);
+        if (opts.includeParams !== false) appendParametersSheet(wb);
 
         if (FB.isJXBrowser) {
             var b64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
@@ -1154,12 +1310,21 @@
         }
     }
 
-    function exportCSV(rows, filename) {
+    function exportCSV(rows, filename, opts) {
+        opts = opts || {};
         var data = CloudPages.hooks.onExport(rows, 'csv');
         if (!data || !data.length) return;
 
         var keys = Object.keys(data[0]);
         var lines = [];
+        // Optional: parameter provenance as comment lines above the header.
+        // Off by default — CSV consumers usually want pure flat data.
+        if (opts.includeParams === true && _lastRunMeta) {
+            lines.push('# ' + _lastRunMeta.title + ' — generated ' + _lastRunMeta.timestamp);
+            _lastRunMeta.params.forEach(function (pr) {
+                lines.push('# ' + pr.label + ': ' + pr.value);
+            });
+        }
         lines.push(keys.map(csvEscape).join(','));
         data.forEach(function (row) {
             lines.push(keys.map(function (k) { return csvEscape(row[k]); }).join(','));
@@ -1187,6 +1352,51 @@
             return '"' + s.replace(/"/g, '""') + '"';
         }
         return s;
+    }
+
+    // Markdown export — title + parameters block + a GFM table. Made for
+    // feeding results into wikis, tickets, and LLM workflows.
+    function mdEscape(val) {
+        if (val === null || val === undefined) return '';
+        return String(val).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+    }
+    function exportMarkdown(rows, filename, opts) {
+        opts = opts || {};
+        var data = CloudPages.hooks.onExport(rows, 'markdown');
+        if (!data || !data.length) return;
+        var keys = Object.keys(data[0]);
+        var out = [];
+        out.push('# ' + ((_lastRunMeta && _lastRunMeta.title) || filename));
+        out.push('');
+        if (opts.includeParams !== false && _lastRunMeta) {
+            out.push('Generated ' + _lastRunMeta.timestamp + ' — ' + data.length + ' rows');
+            out.push('');
+            out.push('| Parameter | Value |');
+            out.push('| --- | --- |');
+            _lastRunMeta.params.forEach(function (pr) {
+                out.push('| ' + mdEscape(pr.label) + ' | ' + mdEscape(pr.value) + ' |');
+            });
+            out.push('');
+        }
+        out.push('| ' + keys.map(mdEscape).join(' | ') + ' |');
+        out.push('| ' + keys.map(function () { return '---'; }).join(' | ') + ' |');
+        data.forEach(function (row) {
+            out.push('| ' + keys.map(function (k) { return mdEscape(row[k]); }).join(' | ') + ' |');
+        });
+        var md = out.join('\n');
+
+        if (FB.isJXBrowser) {
+            var b64 = btoa(unescape(encodeURIComponent(md)));
+            FB.saveFile('Save Report', 'md', 'Markdown Files', b64, filename + '.md', true);
+        } else {
+            var blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename + '.md';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1360,6 +1570,11 @@
                 if (!validateParameters(config.parameters)) return;
 
                 var values = collectValues(config.parameters);
+                _lastRunMeta = {
+                    title: config.settings.title || document.title || 'Report',
+                    timestamp: new Date().toLocaleString(),
+                    params: parameterSummary(config.parameters)
+                };
                 executeQuery(config.query, values, function (err, rows) {
                     if (err) {
                         console.error('CloudPages: query error:', err);
@@ -1374,24 +1589,116 @@
             });
         }
 
-        // Export button
+        // Export buttons: the legacy single #exportBtn is upgraded in place to
+        // [Export XLSX |v] [Export CSV |v] [Markdown] — the carats open a small
+        // options popup (filename, include-parameters) for that format.
         var exportBtn = document.getElementById('exportBtn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', function () {
-                if (!_lastResultRows.length) return;
-                var title = document.title || 'Export';
-                if (config.settings.enable_xlsx_export) {
-                    exportXLSX(_lastResultRows, title);
-                } else if (config.settings.enable_csv_export) {
-                    exportCSV(_lastResultRows, title);
-                }
-            });
-        }
+        if (exportBtn) buildExportUI(exportBtn, config.settings);
 
         // Load on open
         if (config.settings.load_on_open && submitBtn) {
             submitBtn.click();
         }
+
+        applyTheme(config.settings.theme);
+    }
+
+    // Per-format defaults: the parameters record rides along everywhere except
+    // CSV, where flat data is the point (comment lines are opt-in).
+    var EXPORT_FORMATS = {
+        xlsx: { label: 'Export XLSX', fn: exportXLSX, includeParamsDefault: true,
+                paramsHint: 'Add a Parameters sheet' },
+        csv:  { label: 'Export CSV', fn: exportCSV, includeParamsDefault: false,
+                paramsHint: 'Add parameter comment lines (# …) above the header' },
+        markdown: { label: 'Markdown', fn: exportMarkdown, includeParamsDefault: true,
+                paramsHint: 'Add a parameters section' }
+    };
+
+    function defaultFilename(settings) {
+        return ((settings && settings.title) || document.title || 'Report')
+            .replace(/[\\/:*?"<>|]+/g, '-');
+    }
+
+    function buildExportUI(legacyBtn, settings) {
+        var group = document.createElement('div');
+        group.className = 'cp-export-group';
+
+        function runExport(format, opts) {
+            if (!_lastResultRows.length) return;
+            var f = EXPORT_FORMATS[format];
+            var name = (opts && opts.filename) || defaultFilename(settings);
+            f.fn(_lastResultRows, name, {
+                includeParams: opts && 'includeParams' in opts ? opts.includeParams : f.includeParamsDefault
+            });
+        }
+
+        // Options popup (one shared instance, per-format on open)
+        var pop = document.createElement('div');
+        pop.className = 'cp-export-options';
+        pop.hidden = true;
+        pop.innerHTML =
+            '<div class="mb-2"><label class="form-label mb-1">File name</label>' +
+            '<input type="text" class="form-control form-control-sm" id="cp-eo-name"></div>' +
+            '<label class="form-check mb-2"><input type="checkbox" class="form-check-input" id="cp-eo-params"> ' +
+            '<span class="form-check-label" id="cp-eo-params-hint">Include parameters</span></label>' +
+            '<button type="button" class="btn btn-sm btn-primary w-100" id="cp-eo-go">Export</button>';
+        var popFormat = 'xlsx';
+        function openOptions(format, anchor) {
+            popFormat = format;
+            var f = EXPORT_FORMATS[format];
+            pop.querySelector('#cp-eo-name').value = defaultFilename(settings);
+            pop.querySelector('#cp-eo-params').checked = f.includeParamsDefault;
+            pop.querySelector('#cp-eo-params-hint').textContent = f.paramsHint;
+            pop.hidden = false;
+            pop.style.left = anchor.offsetLeft + 'px';
+        }
+        pop.querySelector('#cp-eo-go').addEventListener('click', function () {
+            runExport(popFormat, {
+                filename: pop.querySelector('#cp-eo-name').value.trim() || defaultFilename(settings),
+                includeParams: pop.querySelector('#cp-eo-params').checked
+            });
+            pop.hidden = true;
+        });
+        document.addEventListener('click', function (e) {
+            if (!pop.hidden && !group.contains(e.target)) pop.hidden = true;
+        });
+
+        function addSplit(format) {
+            var f = EXPORT_FORMATS[format];
+            var wrap = document.createElement('div');
+            wrap.className = 'btn-group btn-group-sm cp-export-split';
+            var main = document.createElement('button');
+            main.type = 'button';
+            main.className = 'btn btn-secondary';
+            main.textContent = f.label;
+            main.addEventListener('click', function () { pop.hidden = true; runExport(format); });
+            var caret = document.createElement('button');
+            caret.type = 'button';
+            caret.className = 'btn btn-secondary dropdown-toggle dropdown-toggle-split';
+            caret.title = f.label + ' with options\u2026';
+            caret.setAttribute('aria-label', f.label + ' with options');
+            caret.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (!pop.hidden && popFormat === format) { pop.hidden = true; return; }
+                openOptions(format, wrap);
+            });
+            wrap.appendChild(main);
+            wrap.appendChild(caret);
+            group.appendChild(wrap);
+        }
+
+        if (settings.enable_xlsx_export) addSplit('xlsx');
+        if (settings.enable_csv_export) addSplit('csv');
+        if (settings.enable_markdown_export) {
+            var md = document.createElement('button');
+            md.type = 'button';
+            md.className = 'btn btn-sm btn-outline-secondary';
+            md.textContent = 'Markdown';
+            md.addEventListener('click', function () { pop.hidden = true; runExport('markdown'); });
+            group.appendChild(md);
+        }
+        group.appendChild(pop);
+        legacyBtn.parentNode.replaceChild(group, legacyBtn);
     }
 
     // Auto-init on DOMContentLoaded
@@ -1409,6 +1716,7 @@
     CloudPages.executeQuery = executeQuery;
     CloudPages.exportXLSX = exportXLSX;
     CloudPages.exportCSV = exportCSV;
+    CloudPages.exportMarkdown = exportMarkdown;
     CloudPages.snakeToTitle = snakeToTitle;
     CloudPages.registerRenderer = registerRenderer;
 
