@@ -1666,7 +1666,7 @@
         function addSplit(format) {
             var f = EXPORT_FORMATS[format];
             var wrap = document.createElement('div');
-            wrap.className = 'btn-group btn-group-sm cp-export-split';
+            wrap.className = 'btn-group cp-export-split';
             var main = document.createElement('button');
             main.type = 'button';
             main.className = 'btn btn-secondary';
@@ -1692,7 +1692,7 @@
         if (settings.enable_markdown_export) {
             var md = document.createElement('button');
             md.type = 'button';
-            md.className = 'btn btn-sm btn-outline-secondary';
+            md.className = 'btn btn-outline-secondary';
             md.textContent = 'Markdown';
             md.addEventListener('click', function () { pop.hidden = true; runExport('markdown'); });
             group.appendChild(md);
