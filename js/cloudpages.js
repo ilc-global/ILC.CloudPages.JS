@@ -1309,7 +1309,7 @@
             });
         }
         var wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        XLSX.utils.book_append_sheet(wb, ws, 'Results');
         return wb;
     }
 
@@ -1329,6 +1329,9 @@
         var ws = XLSX.utils.aoa_to_sheet(aoa);
         ws['!cols'] = [{ wch: 28 }, { wch: 48 }];
         XLSX.utils.book_append_sheet(wb, ws, 'Parameters');
+        // Parameters open first — the provenance is the point.
+        wb.SheetNames.splice(wb.SheetNames.indexOf('Parameters'), 1);
+        wb.SheetNames.unshift('Parameters');
     }
 
     CloudPages.buildWorkbook = buildWorkbook;
