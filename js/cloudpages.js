@@ -1364,16 +1364,18 @@
         // Optional: parameter provenance as comment lines above the header.
         // Off by default — CSV consumers usually want pure flat data.
         if (opts.includeParams === true && _lastRunMeta) {
-            lines.push('# ' + _lastRunMeta.title + ' — generated ' + _lastRunMeta.timestamp);
+            lines.push(csvEscape('# ' + _lastRunMeta.title + ' — generated ' + _lastRunMeta.timestamp));
             _lastRunMeta.params.forEach(function (pr) {
-                lines.push('# ' + pr.label + ': ' + pr.value);
+                lines.push(csvEscape('# ' + pr.label + ': ' + pr.value));
             });
         }
         lines.push(keys.map(csvEscape).join(','));
         data.forEach(function (row) {
             lines.push(keys.map(function (k) { return csvEscape(row[k]); }).join(','));
         });
-        var csvStr = lines.join('\r\n');
+        // Leading BOM: Excel treats BOM-less CSV as ANSI and mangles UTF-8
+        // (em-dashes become "â€\u201d", accents break).
+        var csvStr = '\ufeff' + lines.join('\r\n');
 
         if (FB.isJXBrowser) {
             var b64 = btoa(unescape(encodeURIComponent(csvStr)));
