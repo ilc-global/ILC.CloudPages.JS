@@ -59,7 +59,7 @@
         settings.enable_xlsx_export = settings.enable_xlsx_export !== false;
         settings.enable_csv_export = settings.enable_csv_export !== false;
         settings.enable_markdown_export = settings.enable_markdown_export !== false;
-        settings.dense = settings.dense || false;
+        settings.size = settings.size || (settings.dense ? 's' : 'm');   // s=dense, m=normal, l=large
         settings.theme = settings.theme || 'auto';
 
         _config = { settings: settings, parameters: parameters, query: query, columns: columns };
@@ -1148,24 +1148,7 @@
 
         _dataTableInstance = $(table).DataTable(dtConfig);
 
-        // Dense (compact) mode: smaller text + tighter cells for scanning many
-        // rows at once. Toggle button lives in the table toolbar; preference
-        // persists where storage is available (data: URLs throw — ignore).
-        applyDense(currentDense(settings));
-        var toolbar = container.querySelector('.cp-table-toolbar > div');
-        if (toolbar) {
-            var denseBtn = document.createElement('button');
-            denseBtn.type = 'button';
-            denseBtn.className = 'btn btn-sm btn-outline-secondary cp-dense-toggle';
-            denseBtn.textContent = 'Compact';
-            denseBtn.title = 'Toggle compact (smaller text) mode';
-            denseBtn.addEventListener('click', function () {
-                var on = !document.body.classList.contains('cp-dense');
-                applyDense(on);
-                try { localStorage.setItem('cp-dense', on ? '1' : '0'); } catch (e) { /* no storage */ }
-            });
-            toolbar.appendChild(denseBtn);
-        }
+        applySize(currentSize(settings));
 
         // Toggling a column adjusts data-row cells in place without a draw,
         // so RowGroup's header/totals rows keep their old cell layout. Force
@@ -1181,20 +1164,24 @@
     // [6b] Dense mode + Theme
     // ═══════════════════════════════════════════════════════════════════
 
-    function currentDense(settings) {
+    // Size: 's' dense (scan many rows), 'm' normal, 'l' large (meetings /
+    // screen-shares). Persisted where storage exists (data: URLs throw).
+    function currentSize(settings) {
         try {
-            var saved = localStorage.getItem('cp-dense');
-            if (saved === '1') return true;
-            if (saved === '0') return false;
-        } catch (e) { /* data: URL / private mode */ }
-        return !!(settings && settings.dense);
+            var saved = localStorage.getItem('cp-size');
+            if (saved === 's' || saved === 'm' || saved === 'l') return saved;
+        } catch (e) { /* no storage */ }
+        return (settings && settings.size) || 'm';
     }
-    function applyDense(on) {
-        document.body.classList.toggle('cp-dense', !!on);
-        var btn = document.querySelector('.cp-dense-toggle');
-        if (btn) btn.classList.toggle('active', !!on);
+    function applySize(mode) {
+        document.body.classList.toggle('cp-dense', mode === 's');
+        document.body.classList.toggle('cp-large', mode === 'l');
+        Array.prototype.forEach.call(document.querySelectorAll('.cp-size-btn'), function (b) {
+            b.classList.toggle('active', b.dataset.size === mode);
+        });
+        try { localStorage.setItem('cp-size', mode); } catch (e) { /* no storage */ }
     }
-    CloudPages.setDense = applyDense;
+    CloudPages.setSize = applySize;
 
     // Theme: settings.theme 'auto' | 'light' | 'dark'. Bootstrap 5.3 does the
     // heavy lifting via data-bs-theme. 'auto' follows the OS; if fb.js ever
@@ -1216,6 +1203,60 @@
         if (mq && mq.addEventListener) mq.addEventListener('change', function (e) { set(e.matches); });
     }
     CloudPages.applyTheme = applyTheme;
+
+    // Header control cluster — rendered ONLY when the page provides an empty
+    // <div id="cp-controls"></div> (typically in its header, by the version
+    // stamp): a theme cycler (Auto → Light → Dark) and an S/M/L size picker.
+    var THEME_ORDER = ['auto', 'light', 'dark'];
+    var THEME_GLYPH = { auto: '\u25d0', light: '\u2600', dark: '\u263e' };
+    function currentThemePref(settings) {
+        try {
+            var saved = localStorage.getItem('cp-theme');
+            if (THEME_ORDER.indexOf(saved) >= 0) return saved;
+        } catch (e) { /* no storage */ }
+        return (settings && settings.theme) || 'auto';
+    }
+    function buildControls(settings) {
+        var host = document.getElementById('cp-controls');
+        if (!host) return;
+        host.classList.add('cp-controls');
+
+        // Theme cycler
+        var themeBtn = document.createElement('button');
+        themeBtn.type = 'button';
+        themeBtn.className = 'btn btn-sm btn-outline-secondary cp-theme-toggle';
+        var mode = currentThemePref(settings);
+        function paintTheme() {
+            themeBtn.textContent = THEME_GLYPH[mode];
+            themeBtn.title = 'Theme: ' + mode.charAt(0).toUpperCase() + mode.slice(1) +
+                (mode === 'auto' ? ' (follow system)' : '') + ' — click to change';
+        }
+        themeBtn.addEventListener('click', function () {
+            mode = THEME_ORDER[(THEME_ORDER.indexOf(mode) + 1) % THEME_ORDER.length];
+            applyTheme(mode);
+            paintTheme();
+            try { localStorage.setItem('cp-theme', mode); } catch (e) { /* no storage */ }
+        });
+        paintTheme();
+        host.appendChild(themeBtn);
+
+        // S/M/L size picker
+        var seg = document.createElement('div');
+        seg.className = 'btn-group btn-group-sm cp-size-seg';
+        seg.setAttribute('role', 'group');
+        [['s', 'S', 'Small — dense rows'], ['m', 'M', 'Medium — normal'], ['l', 'L', 'Large — meetings']].forEach(function (t) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn btn-outline-secondary cp-size-btn';
+            b.dataset.size = t[0];
+            b.textContent = t[1];
+            b.title = t[2];
+            b.addEventListener('click', function () { applySize(t[0]); });
+            seg.appendChild(b);
+        });
+        host.appendChild(seg);
+        applySize(currentSize(settings));
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // [7] Export Engine
@@ -1600,7 +1641,8 @@
             submitBtn.click();
         }
 
-        applyTheme(config.settings.theme);
+        applyTheme(currentThemePref(config.settings));
+        buildControls(config.settings);
     }
 
     // Per-format defaults: the parameters record rides along everywhere except

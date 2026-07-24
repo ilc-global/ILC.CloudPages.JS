@@ -186,7 +186,7 @@
     text-align: left;
 }
 
-/* ── Dense (compact) mode ────────────────────────────────────────────── */
+/* ── Size modes: S (dense) / M (normal) / L (large, for meetings) ────── */
 body.cp-dense #cp-data-table {
     font-size: 11.5px;
 }
@@ -195,8 +195,24 @@ body.cp-dense #cp-data-table th {
     padding: 2px 6px;
     line-height: 1.25;
 }
-.cp-dense-toggle.active {
-    background-color: var(--bs-secondary-bg, #e2e3e5);
+body.cp-large #cp-data-table {
+    font-size: 17px;
+}
+body.cp-large #cp-data-table td,
+body.cp-large #cp-data-table th {
+    padding: 10px 12px;
+}
+
+/* ── Header control cluster (#cp-controls): theme + S/M/L ────────────── */
+.cp-controls {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    vertical-align: middle;
+}
+.cp-size-btn.active {
+    background-color: var(--bs-secondary, #6c757d);
+    color: #fff;
 }
 
 /* ── Dark theme (Bootstrap 5.3 data-bs-theme) for engine components ──── */
