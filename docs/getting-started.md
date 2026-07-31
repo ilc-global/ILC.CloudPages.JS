@@ -41,7 +41,7 @@ Create a new `.html` file. This file goes in your CloudPages plugin directory â€
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
     <!-- ILC Libraries -->
-    <script src="js/fb.js"></script>
+    <script src="https://cdn.ilcreports.com/fb/v2026.07.31.7/fb.js"></script>
     <script src="js/cloudpages.js"></script>
     <link rel="stylesheet" href="css/cloudpages.css">
 </head>

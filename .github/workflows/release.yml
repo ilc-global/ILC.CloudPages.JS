@@ -11,7 +11,6 @@ on:
     branches: [main]
     paths:
       - 'js/cloudpages.js'
-      - 'js/fb.js'
       - 'css/cloudpages.css'
 
 jobs:
@@ -32,7 +31,7 @@ jobs:
       - name: Stage files
         run: |
           mkdir -p dist
-          cp js/cloudpages.js css/cloudpages.css js/fb.js LICENSE dist/
+          cp js/cloudpages.js css/cloudpages.css LICENSE dist/
 
       # Stamp, then PROVE the stamp landed. A release whose bytes don't declare their own
       # version is the exact failure this workflow exists to prevent, so it fails the build.
@@ -41,7 +40,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          for f in dist/cloudpages.js dist/fb.js dist/cloudpages.css; do
+          for f in dist/cloudpages.js dist/cloudpages.css; do
             sed -i -E "s/@version[[:space:]]+[^[:space:]*]+/@version ${VERSION}/" "$f"
             if ! grep -q "@version ${VERSION}" "$f"; then
               echo "::error file=${f}::version stamp did not apply — is the '@version' header missing?"
@@ -57,7 +56,7 @@ jobs:
       - name: Build zip
         run: |
           cd dist && zip ../ILC.CloudPages.JS-v${{ steps.version.outputs.version }}.zip \
-            cloudpages.js cloudpages.css fb.js LICENSE
+            cloudpages.js cloudpages.css LICENSE
 
       - name: Create release
         uses: softprops/action-gh-release@v2
