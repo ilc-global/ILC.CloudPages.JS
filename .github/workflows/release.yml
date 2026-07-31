@@ -1,11 +1,17 @@
 name: Build Release
 
+# The release version is generated HERE and stamped into the artifacts. It is never
+# stored in the repo: source files carry `@version 0.0.0-dev` and nobody hand-edits it.
+# That removes the class of bug where the tag and the file disagreed about what a
+# release was (see the CDN publisher, which verifies the stamp before publishing).
+
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - 'js/cloudpages.js'
+      - 'js/fb.js'
       - 'css/cloudpages.css'
 
 jobs:
@@ -23,13 +29,35 @@ jobs:
           DATE_VER=$(date -u +'%Y.%m.%d')
           echo "version=${DATE_VER}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
-      - name: Build zip
+      - name: Stage files
         run: |
           mkdir -p dist
-          cp js/cloudpages.js dist/
-          cp css/cloudpages.css dist/
-          cp LICENSE dist/
-          cd dist && zip ../ILC.CloudPages.JS-v${{ steps.version.outputs.version }}.zip cloudpages.js cloudpages.css LICENSE
+          cp js/cloudpages.js css/cloudpages.css js/fb.js LICENSE dist/
+
+      # Stamp, then PROVE the stamp landed. A release whose bytes don't declare their own
+      # version is the exact failure this workflow exists to prevent, so it fails the build.
+      - name: Stamp version into artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for f in dist/cloudpages.js dist/fb.js dist/cloudpages.css; do
+            sed -i -E "s/@version[[:space:]]+[^[:space:]*]+/@version ${VERSION}/" "$f"
+            if ! grep -q "@version ${VERSION}" "$f"; then
+              echo "::error file=${f}::version stamp did not apply — is the '@version' header missing?"
+              exit 1
+            fi
+            echo "stamped $(basename "$f") -> ${VERSION}"
+          done
+          if grep -rn "0.0.0-dev" dist/; then
+            echo "::error::a dist file still carries the 0.0.0-dev placeholder"
+            exit 1
+          fi
+
+      - name: Build zip
+        run: |
+          cd dist && zip ../ILC.CloudPages.JS-v${{ steps.version.outputs.version }}.zip \
+            cloudpages.js cloudpages.css fb.js LICENSE
 
       - name: Create release
         uses: softprops/action-gh-release@v2

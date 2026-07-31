@@ -6,7 +6,7 @@
  *
  * Dependencies: fb.js (loaded first), jQuery, DataTables, SheetJS (XLSX)
  *
- * @version 2.2.0
+ * @version 0.0.0-dev
  * @license Source-Available (ILC Technology LLC)
  */
 (function (window, $) {
