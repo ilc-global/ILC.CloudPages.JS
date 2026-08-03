@@ -1,5 +1,8 @@
 # Getting Started with CloudPages
 
+> `https://<ilc-cdn>` stands for the ILC CDN base URL. Ask an ILC
+> administrator for it; it is not recorded in this repo.
+
 This guide walks you through building your first CloudPage report â€” from an empty HTML file to a working, interactive report with parameters, a data table, and Excel export.
 
 ## Prerequisites
@@ -41,7 +44,7 @@ Create a new `.html` file. This file goes in your CloudPages plugin directory â€
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
     <!-- ILC Libraries -->
-    <script src="https://cdn.ilcreports.com/fb/v2026.07.31.7/fb.js"></script>
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
     <script src="js/cloudpages.js"></script>
     <link rel="stylesheet" href="css/cloudpages.css">
 </head>

@@ -25,7 +25,7 @@ A report showing open sales orders filtered by customer and date range, with cur
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.ilcreports.com/fb/v2026.07.31.7/fb.js"></script>
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
     <script src="js/cloudpages.js"></script>
     <link rel="stylesheet" href="css/cloudpages.css">
 </head>
@@ -120,7 +120,7 @@ A dashboard-style report that loads automatically and shows current inventory fo
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.ilcreports.com/fb/v2026.07.31.7/fb.js"></script>
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
     <script src="js/cloudpages.js"></script>
     <link rel="stylesheet" href="css/cloudpages.css">
 </head>
@@ -214,7 +214,7 @@ Uses the autocomplete parameter type for a fast part search experience.
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.ilcreports.com/fb/v2026.07.31.7/fb.js"></script>
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
     <script src="js/cloudpages.js"></script>
     <link rel="stylesheet" href="css/cloudpages.css">
 </head>
@@ -306,7 +306,7 @@ Uses `onAfterQuery` to add computed columns and `onExport` to add a summary row.
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.ilcreports.com/fb/v2026.07.31.7/fb.js"></script>
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
     <script src="js/cloudpages.js"></script>
     <link rel="stylesheet" href="css/cloudpages.css">
 </head>

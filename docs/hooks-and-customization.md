@@ -7,7 +7,7 @@ CloudPages provides hooks at each stage of the lifecycle and a renderer registry
 Hooks are functions on `CloudPages.hooks` that fire at specific lifecycle points. Override them in a `<script>` block after loading cloudpages.js.
 
 ```html
-<script src="https://cdn.ilcreports.com/fb/v2026.07.31.7/fb.js"></script>
+<script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
 <script src="js/cloudpages.js"></script>
 <script>
     // Your hooks go here
