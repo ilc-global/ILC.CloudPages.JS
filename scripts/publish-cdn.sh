@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish cloudpages.js to the CDN storage account (ilcreportscdn / $web).
+# Publish cloudpages.js to the CDN storage account.
 #
 #   ./scripts/publish-cdn.sh 2.2.1                 # upload v2.2.1 (immutable) + move `latest`
 #   ./scripts/publish-cdn.sh --promote-stable 2.2.1  # point `stable` at an ALREADY-published version
@@ -12,9 +12,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ACCT=(--account-name ilcreportscdn --subscription "Y-ILC_Internal" --auth-mode key)
+# --- CDN target -------------------------------------------------------------
+# The storage account, subscription and resource group are not committed.
+# Copy scripts/cdn.env.example to scripts/cdn.env and fill it in, or export
+# these in your shell. The script refuses to run without them.
+[ -f "$(dirname "$0")/cdn.env" ] && . "$(dirname "$0")/cdn.env"
+: "${CDN_ACCOUNT:?set CDN_ACCOUNT (see scripts/cdn.env.example)}"
+: "${CDN_SUBSCRIPTION:?set CDN_SUBSCRIPTION (see scripts/cdn.env.example)}"
+: "${CDN_BASE_URL:?set CDN_BASE_URL (see scripts/cdn.env.example)}"
+ACCT=(--account-name "$CDN_ACCOUNT" --subscription "$CDN_SUBSCRIPTION" --auth-mode "${CDN_AUTH_MODE:-login}")
 WEB='$web'
-BASE="https://ilcreportscdn.z5.web.core.windows.net/cloudpages"
+BASE="${CDN_BASE_URL%/}/cloudpages"
 
 up() { az storage blob upload "${ACCT[@]}" -c "$WEB" -f "$1" -n "$2" \
         --content-type "$3" --content-cache-control "$4" --overwrite --only-show-errors -o none

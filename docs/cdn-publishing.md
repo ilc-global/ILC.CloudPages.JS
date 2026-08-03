@@ -1,10 +1,11 @@
 # CDN Publishing & Management
 
-The CloudPages CDN lives on the Azure storage account **ilcreportscdn**
-(`ILC.FishbowlReports` RG, static website / `$web`), fronted by
-**cdn.ilcreports.com** (Cloudflare). This repo is the single source of truth:
-**nothing is ever hand-uploaded** — the two scripts below are the only write
+`cdn.ilcreports.com` serves the library. This repo is the single source of
+truth: nothing is ever hand-uploaded, the two scripts below are the only write
 path, and this repo's git history is the CDN's audit log.
+
+The storage target is not recorded here. `scripts/publish-cdn.sh` reads it from
+`scripts/cdn.env`, which is not committed — see `scripts/cdn.env.example`.
 
 ## Layout
 
@@ -65,6 +66,6 @@ documented offline fallback for egress-restricted customer sites.
 - Vendor bytes come from upstream at publish time, hashes recorded (SRI).
 
 ## Access
-Publishing needs Azure CLI auth on the **Y-ILC_Internal** subscription with
-rights to `ilcreportscdn` (scripts use `--auth-mode key`). Cloudflare fronts
-the domain; DNS/Worker changes go through the ilcreports.com zone.
+Publishing needs Azure CLI auth with write rights on the storage target named
+in `scripts/cdn.env`. Ask an ILC administrator for access. Cloudflare fronts
+the domain; DNS and Worker changes go through the ilcreports.com zone.

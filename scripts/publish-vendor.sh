@@ -7,7 +7,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ACCT=(--account-name ilcreportscdn --subscription "Y-ILC_Internal" --auth-mode key)
+# --- CDN target -------------------------------------------------------------
+# The storage account, subscription and resource group are not committed.
+# Copy scripts/cdn.env.example to scripts/cdn.env and fill it in, or export
+# these in your shell. The script refuses to run without them.
+[ -f "$(dirname "$0")/cdn.env" ] && . "$(dirname "$0")/cdn.env"
+: "${CDN_ACCOUNT:?set CDN_ACCOUNT (see scripts/cdn.env.example)}"
+: "${CDN_SUBSCRIPTION:?set CDN_SUBSCRIPTION (see scripts/cdn.env.example)}"
+: "${CDN_BASE_URL:?set CDN_BASE_URL (see scripts/cdn.env.example)}"
+ACCT=(--account-name "$CDN_ACCOUNT" --subscription "$CDN_SUBSCRIPTION" --auth-mode "${CDN_AUTH_MODE:-login}")
 WEB='$web'
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
