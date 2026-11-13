@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="Receipts">
+    <meta name="fb_description" content="UNION report with custom fields the user picks.">
+    <meta name="ilc_page_type" content="report">
+    <title>Receipts</title>
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/bootstrap/5.3.3/bootstrap.min.css"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/datatables/1.13.8/dataTables.bootstrap5.min.css"
+          integrity="sha384-ok3J6xA9oQqai5C9ytYveFsBeKgoGk4T+NExsr6hoIKjZdv9SJcmx2mafwUWRNf9" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.bootstrap5.min.css"
+          integrity="sha384-ElnGX1+feu5KEucSXJLJE9peLXQ3kZDXmq9a2q6nS26zB8zJ7j6ZlljCktlrgsUx" crossorigin="anonymous">
+    <link rel="stylesheet" href="../../css/cloudpages.css">
+
+    <script src="https://<ilc-cdn>/vendor/jquery/3.7.1/jquery.min.js"
+            integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables/1.13.8/jquery.dataTables.min.js"
+            integrity="sha384-Udt767MMeKelGRBxaCfxX88YDLbViYdQ7T/gkRoB197Jf+OviZ+lsaRAOpS/MIjf" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables/1.13.8/dataTables.bootstrap5.min.js"
+            integrity="sha384-PgPBH0hy6DTJwu7pTf6bkRqPlf/+pjUBExpr/eIfzszlGYFlF9Wi9VTAJODPhgCO" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/dataTables.buttons.min.js"
+            integrity="sha384-D7Ifmm6VZVyjXndPxbvw6UXiK3Vixw1lgK5y+0pVVaQvzHPCpx8atng0IjL5wdcQ" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.bootstrap5.min.js"
+            integrity="sha384-8Fm9OFhJ1epvcmDiJTZ2SFHHZoCp/xJ8Ld7wG7/aUwGni32fG7LIhsNTFfEtUaSv" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.colVis.min.js"
+            integrity="sha384-dyI79OT6UE9qWK4x3HAQSilUPj6TfmkE8pX6KeBTyrhOaNrk7cbvUZUDMuC8S7/k" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/xlsx/0.20.1/xlsx.full.min.js"
+            integrity="sha384-QCIdq2UMVEoSRhR3ZWZwdz2/pivLowr+eokFMdYyukq7qI26VYRxFa4Nl6FKetmL" crossorigin="anonymous"></script>
+
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
+    <script src="../../js/cloudpages.js"></script>
+</head>
+<body>
+<div class="container-fluid py-3">
+    <header class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">Receipts</h4>
+            <span class="text-muted small">Custom fields test page</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div id="cp-controls"></div>
+            <span id="env-badge" class="badge text-bg-secondary"></span>
+        </div>
+    </header>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div id="parametersContainer"></div>
+            <div class="d-flex gap-2 mt-2">
+                <button id="submitButton" class="btn btn-primary">Run</button>
+                <button id="exportBtn" class="btn btn-outline-secondary">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tableContainer"></div>
+</div>
+
+<script id="settings" type="application/json">
+{
+  "load_on_open": false,
+  "page_length": 50,
+  "column_toggles": true,
+  "theme": "auto",
+  "group_by": "order_num",
+  "group_totals": [
+    "qty",
+    "total_cost",
+    "landed_cost"
+  ],
+  "custom_fields": {
+    "po": "PO",
+    "so": "SO",
+    "part": "Part"
+  }
+}
+</script>
+
+<script id="parameters" type="application/json">
+{
+  "date_field": {
+    "label": "Filter date",
+    "type": "dropdown",
+    "mode": "single",
+    "options": [
+      {
+        "value": "received",
+        "label": "Date Received"
+      },
+      {
+        "value": "issued",
+        "label": "Date Issued"
+      }
+    ],
+    "default": "received",
+    "demo_filter": false
+  },
+  "date_range": {
+    "label": "Date range",
+    "type": "date",
+    "mode": "range",
+    "demo_column": "date_received"
+  },
+  "order_types": {
+    "label": "Order types",
+    "type": "dropdown",
+    "mode": "multi",
+    "options": [
+      {
+        "value": "10",
+        "label": "Purchase Orders"
+      },
+      {
+        "value": "20",
+        "label": "Sales Orders (returns)"
+      },
+      {
+        "value": "40",
+        "label": "Transfer Orders"
+      }
+    ],
+    "demo_column": "order_type_id"
+  },
+  "statuses": {
+    "label": "Receipt status",
+    "type": "dropdown",
+    "mode": "multi",
+    "options": [
+      {
+        "value": "10",
+        "label": "Entered"
+      },
+      {
+        "value": "20",
+        "label": "Reconciled"
+      },
+      {
+        "value": "30",
+        "label": "Received"
+      },
+      {
+        "value": "40",
+        "label": "Fulfilled"
+      }
+    ],
+    "demo_column": "status_id"
+  },
+  "vendor": {
+    "label": "Vendor",
+    "type": "dropdown",
+    "mode": "multi",
+    "sql": "SELECT id, name FROM vendor WHERE activeFlag = 1 ORDER BY name",
+    "value": "id",
+    "display": "name",
+    "demo_column": "vendor_id"
+  },
+  "customer": {
+    "label": "Customer (returns)",
+    "type": "dropdown",
+    "mode": "multi",
+    "sql": "SELECT id, name FROM customer WHERE activeFlag = 1 ORDER BY name",
+    "value": "id",
+    "display": "name",
+    "demo_column": "customer_id"
+  },
+  "location_groups": {
+    "label": "Location group",
+    "type": "dropdown",
+    "mode": "multi",
+    "sql": "SELECT id, name FROM locationgroup WHERE activeFlag = 1 ORDER BY name",
+    "value": "id",
+    "display": "name",
+    "demo_column": "location_group_id"
+  },
+  "part": {
+    "label": "Part contains",
+    "type": "string",
+    "demo_column": "part_num"
+  },
+  "receipt_id": {
+    "label": "Receipt #",
+    "type": "int",
+    "demo_column": "receipt_id"
+  }
+}
+</script>
+
+<!-- The three branches are the Receiving Summary query. Each cf marker lists
+     the records its branch has. -->
+<script id="query" type="text/plain">
+SELECT po.num AS order_num,
+       'PO' AS order_type,
+       10 AS order_type_id,
+       vendor.name AS source_name,
+       part.num AS part_num,
+       part.description AS description,
+       ri.qty AS qty,
+       uom.code AS uom,
+       ri.billedtotalcost AS total_cost,
+       ri.billedtotalcost / NULLIF(ri.qty, 0) AS unit_cost,
+       ri.landedtotalcost AS landed_cost,
+       ri.landedtotalcost - ri.billedtotalcost AS difference,
+       DATE(po.dateissued) AS date_issued,
+       DATE(ri.datereceived) AS date_received,
+       DATE(ri.datebilled) AS bill_date,
+       DATE(ri.datereconciled) AS date_reconciled,
+       DATE(ri.datelastmodified) AS date_last_changed,
+       ri.statusid AS status_id,
+       receipt.id AS receipt_id
+       /*cf:select po part*/
+FROM receiptitem ri
+JOIN receipt ON ri.receiptid = receipt.id
+JOIN poitem ON ri.poitemid = poitem.id AND ri.ordertypeid = 10
+LEFT JOIN po ON poitem.poid = po.id
+LEFT JOIN vendor ON po.vendorid = vendor.id
+JOIN part ON poitem.partid = part.id
+JOIN uom ON ri.uomid = uom.id
+WHERE 1 = 1
+  AND 10 IN (:order_types) /*opt:order_types*/
+  AND ri.statusid IN (:statuses) /*opt:statuses*/
+  AND DATE(IF(:date_field = 'issued', po.dateissued, ri.datereceived)) >= :date_range_start /*opt:date_range_start*/
+  AND DATE(IF(:date_field = 'issued', po.dateissued, ri.datereceived)) <= :date_range_end /*opt:date_range_end*/
+  AND receipt.id = :receipt_id /*opt:receipt_id*/
+  /*cf:where po part*/
+
+UNION ALL
+
+SELECT so.num AS order_num,
+       'SO' AS order_type,
+       20 AS order_type_id,
+       customer.name AS source_name,
+       part.num AS part_num,
+       part.description AS description,
+       ri.qty AS qty,
+       uom.code AS uom,
+       ri.billedtotalcost AS total_cost,
+       ri.billedtotalcost / NULLIF(ri.qty, 0) AS unit_cost,
+       ri.landedtotalcost AS landed_cost,
+       ri.landedtotalcost - ri.billedtotalcost AS difference,
+       DATE(so.dateissued) AS date_issued,
+       DATE(ri.datereceived) AS date_received,
+       DATE(ri.datebilled) AS bill_date,
+       DATE(ri.datereconciled) AS date_reconciled,
+       DATE(ri.datelastmodified) AS date_last_changed,
+       ri.statusid AS status_id,
+       receipt.id AS receipt_id
+       /*cf:select so part*/
+FROM receiptitem ri
+JOIN receipt ON ri.receiptid = receipt.id
+JOIN soitem ON ri.soitemid = soitem.id AND ri.ordertypeid = 20
+LEFT JOIN so ON soitem.soid = so.id
+LEFT JOIN customer ON so.customerid = customer.id
+LEFT JOIN product ON soitem.productid = product.id
+LEFT JOIN part ON product.partid = part.id
+JOIN uom ON ri.uomid = uom.id
+WHERE 1 = 1
+  AND 20 IN (:order_types) /*opt:order_types*/
+  AND ri.statusid IN (:statuses) /*opt:statuses*/
+  AND DATE(IF(:date_field = 'issued', so.dateissued, ri.datereceived)) >= :date_range_start /*opt:date_range_start*/
+  AND DATE(IF(:date_field = 'issued', so.dateissued, ri.datereceived)) <= :date_range_end /*opt:date_range_end*/
+  AND receipt.id = :receipt_id /*opt:receipt_id*/
+  /*cf:where so part*/
+
+UNION ALL
+
+SELECT xo.num AS order_num,
+       'TO' AS order_type,
+       40 AS order_type_id,
+       xo.shiptoname AS source_name,
+       part.num AS part_num,
+       part.description AS description,
+       ri.qty AS qty,
+       uom.code AS uom,
+       ri.billedtotalcost AS total_cost,
+       ri.billedtotalcost / NULLIF(ri.qty, 0) AS unit_cost,
+       ri.landedtotalcost AS landed_cost,
+       ri.landedtotalcost - ri.billedtotalcost AS difference,
+       DATE(xo.dateissued) AS date_issued,
+       DATE(ri.datereceived) AS date_received,
+       DATE(ri.datebilled) AS bill_date,
+       DATE(ri.datereconciled) AS date_reconciled,
+       DATE(ri.datelastmodified) AS date_last_changed,
+       ri.statusid AS status_id,
+       receipt.id AS receipt_id
+       /*cf:select part*/
+FROM receiptitem ri
+JOIN receipt ON ri.receiptid = receipt.id
+JOIN xoitem ON ri.xoitemid = xoitem.id AND ri.ordertypeid = 40
+LEFT JOIN xo ON xoitem.xoid = xo.id
+LEFT JOIN part ON xoitem.partid = part.id
+JOIN uom ON ri.uomid = uom.id
+WHERE 1 = 1
+  AND 40 IN (:order_types) /*opt:order_types*/
+  AND ri.statusid IN (:statuses) /*opt:statuses*/
+  AND DATE(IF(:date_field = 'issued', xo.dateissued, ri.datereceived)) >= :date_range_start /*opt:date_range_start*/
+  AND DATE(IF(:date_field = 'issued', xo.dateissued, ri.datereceived)) <= :date_range_end /*opt:date_range_end*/
+  AND receipt.id = :receipt_id /*opt:receipt_id*/
+  /*cf:where part*/
+
+ORDER BY 1, 5, 14
+    </script>
+
+<script id="columns" type="application/json">
+{
+  "order_num": {
+    "label": "Order #"
+  },
+  "order_type": {
+    "label": "Type"
+  },
+  "order_type_id": {
+    "visible": false
+  },
+  "source_name": {
+    "label": "Vendor / Source"
+  },
+  "part_num": {
+    "label": "Part"
+  },
+  "description": {
+    "label": "Description"
+  },
+  "qty": {
+    "label": "Qty",
+    "format": "number"
+  },
+  "uom": {
+    "label": "UOM"
+  },
+  "total_cost": {
+    "label": "Total Cost",
+    "format": "currency"
+  },
+  "unit_cost": {
+    "label": "Unit Cost",
+    "format": "currency"
+  },
+  "landed_cost": {
+    "label": "Landed Cost",
+    "format": "currency"
+  },
+  "difference": {
+    "label": "Difference",
+    "format": "currency"
+  },
+  "date_issued": {
+    "label": "Date Issued",
+    "format": "date"
+  },
+  "date_received": {
+    "label": "Date Received",
+    "format": "date"
+  },
+  "bill_date": {
+    "label": "Bill Date",
+    "format": "date",
+    "visible": false
+  },
+  "date_reconciled": {
+    "label": "Date Reconciled",
+    "format": "date",
+    "visible": false
+  },
+  "date_last_changed": {
+    "label": "Last Changed",
+    "format": "date",
+    "visible": false
+  },
+  "status_id": {
+    "visible": false
+  },
+  "receipt_id": {
+    "label": "Receipt #",
+    "visible": false
+  }
+}
+</script>
+
+<script id="demo" type="application/json">
+{
+  "query": [
+    {
+      "order_num": "PO-2088",
+      "order_type": "PO",
+      "order_type_id": 10,
+      "source_name": "Acme Fasteners",
+      "part_num": "BOLT-M8",
+      "description": "Hex bolt M8x30 zinc",
+      "qty": 2000,
+      "uom": "ea",
+      "total_cost": 340.0,
+      "unit_cost": 0.17,
+      "landed_cost": 371.0,
+      "difference": 31.0,
+      "date_issued": "2026-06-12",
+      "date_received": "2026-07-02",
+      "bill_date": "2026-07-05",
+      "date_reconciled": "2026-07-06",
+      "date_last_changed": "2026-07-06",
+      "status_id": 40,
+      "receipt_id": 501,
+      "cf_po_71": "Domestic",
+      "cf_po_72": "2026-07-01",
+      "cf_po_73": "true",
+      "cf_part_81": "Hardware",
+      "cf_part_82": "0.25"
+    },
+    {
+      "order_num": "PO-2088",
+      "order_type": "PO",
+      "order_type_id": 10,
+      "source_name": "Acme Fasteners",
+      "part_num": "NUT-M8",
+      "description": "Hex nut M8 zinc",
+      "qty": 2000,
+      "uom": "ea",
+      "total_cost": 180.0,
+      "unit_cost": 0.09,
+      "landed_cost": 196.0,
+      "difference": 16.0,
+      "date_issued": "2026-06-12",
+      "date_received": "2026-07-02",
+      "bill_date": "2026-07-05",
+      "date_reconciled": "2026-07-06",
+      "date_last_changed": "2026-07-06",
+      "status_id": 40,
+      "receipt_id": 501,
+      "cf_po_71": "Domestic",
+      "cf_po_72": "2026-07-01",
+      "cf_po_73": "true",
+      "cf_part_81": "Hardware",
+      "cf_part_82": "0.25"
+    },
+    {
+      "order_num": "PO-2095",
+      "order_type": "PO",
+      "order_type_id": 10,
+      "source_name": "Pacific Bearing Co",
+      "part_num": "BRG-6204",
+      "description": "Ball bearing 6204-2RS",
+      "qty": 120,
+      "uom": "ea",
+      "total_cost": 214.8,
+      "unit_cost": 1.79,
+      "landed_cost": 238.8,
+      "difference": 24.0,
+      "date_issued": "2026-06-20",
+      "date_received": "2026-07-09",
+      "bill_date": "2026-07-11",
+      "date_reconciled": null,
+      "date_last_changed": "2026-07-11",
+      "status_id": 30,
+      "receipt_id": 502,
+      "cf_po_71": "Import",
+      "cf_po_72": "2026-07-08",
+      "cf_po_73": "false",
+      "cf_part_81": "Bearings",
+      "cf_part_82": "4.10"
+    },
+    {
+      "order_num": "PO-2101",
+      "order_type": "PO",
+      "order_type_id": 10,
+      "source_name": "Great Lakes Steel",
+      "part_num": "SHT-14GA",
+      "description": "Sheet steel 14ga 48x96",
+      "qty": 40,
+      "uom": "ea",
+      "total_cost": 2280.0,
+      "unit_cost": 57.0,
+      "landed_cost": 2469.0,
+      "difference": 189.0,
+      "date_issued": "2026-06-28",
+      "date_received": "2026-07-14",
+      "bill_date": null,
+      "date_reconciled": null,
+      "date_last_changed": "2026-07-14",
+      "status_id": 20,
+      "receipt_id": 503,
+      "cf_po_71": "Domestic",
+      "cf_po_72": "2026-07-15",
+      "cf_po_73": null,
+      "cf_part_81": "Raw steel",
+      "cf_part_82": "82.00"
+    },
+    {
+      "order_num": "PO-2101",
+      "order_type": "PO",
+      "order_type_id": 10,
+      "source_name": "Great Lakes Steel",
+      "part_num": "TUBE-2SQ",
+      "description": "Square tube 2in 11ga",
+      "qty": 40,
+      "uom": "ea",
+      "total_cost": 1039.6,
+      "unit_cost": 25.99,
+      "landed_cost": 1125.6,
+      "difference": 86.0,
+      "date_issued": "2026-06-28",
+      "date_received": "2026-07-14",
+      "bill_date": null,
+      "date_reconciled": null,
+      "date_last_changed": "2026-07-14",
+      "status_id": 20,
+      "receipt_id": 503,
+      "cf_po_71": "Domestic",
+      "cf_po_72": "2026-07-15",
+      "cf_po_73": null,
+      "cf_part_81": "Raw steel",
+      "cf_part_82": "36.50"
+    },
+    {
+      "order_num": "PO-2109",
+      "order_type": "PO",
+      "order_type_id": 10,
+      "source_name": "Nordic Plastics",
+      "part_num": "HSNG-100",
+      "description": "ABS housing, black",
+      "qty": 750,
+      "uom": "ea",
+      "total_cost": 1650.0,
+      "unit_cost": 2.2,
+      "landed_cost": 1650.0,
+      "difference": 0.0,
+      "date_issued": "2026-07-01",
+      "date_received": "2026-07-18",
+      "bill_date": null,
+      "date_reconciled": null,
+      "date_last_changed": "2026-07-18",
+      "status_id": 10,
+      "receipt_id": 504,
+      "cf_po_71": "Import",
+      "cf_po_72": null,
+      "cf_po_73": "true",
+      "cf_part_81": "Plastics",
+      "cf_part_82": "5.75"
+    },
+    {
+      "order_num": "SO-7742",
+      "order_type": "SO",
+      "order_type_id": 20,
+      "source_name": "Summit Outfitters",
+      "part_num": "KIT-STD",
+      "description": "Standard kit (return)",
+      "qty": 6,
+      "uom": "ea",
+      "total_cost": 449.7,
+      "unit_cost": 74.95,
+      "landed_cost": 449.7,
+      "difference": 0.0,
+      "date_issued": "2026-06-05",
+      "date_received": "2026-07-06",
+      "bill_date": "2026-07-08",
+      "date_reconciled": "2026-07-08",
+      "date_last_changed": "2026-07-08",
+      "status_id": 40,
+      "receipt_id": 505,
+      "cf_so_51": "West",
+      "cf_part_81": null,
+      "cf_part_82": "74.95"
+    },
+    {
+      "order_num": "SO-7810",
+      "order_type": "SO",
+      "order_type_id": 20,
+      "source_name": "Harbor Supply",
+      "part_num": "HSNG-100",
+      "description": "ABS housing (return)",
+      "qty": 24,
+      "uom": "ea",
+      "total_cost": 96.0,
+      "unit_cost": 4.0,
+      "landed_cost": 96.0,
+      "difference": 0.0,
+      "date_issued": "2026-06-18",
+      "date_received": "2026-07-16",
+      "bill_date": null,
+      "date_reconciled": null,
+      "date_last_changed": "2026-07-16",
+      "status_id": 30,
+      "receipt_id": 506,
+      "cf_so_51": "East",
+      "cf_part_81": "Plastics",
+      "cf_part_82": "5.75"
+    },
+    {
+      "order_num": "TO-0331",
+      "order_type": "TO",
+      "order_type_id": 40,
+      "source_name": "Main Warehouse",
+      "part_num": "BRG-6001",
+      "description": "Ball bearing 6001-ZZ",
+      "qty": 200,
+      "uom": "ea",
+      "total_cost": 236.0,
+      "unit_cost": 1.18,
+      "landed_cost": 236.0,
+      "difference": 0.0,
+      "date_issued": "2026-07-03",
+      "date_received": "2026-07-10",
+      "bill_date": null,
+      "date_reconciled": null,
+      "date_last_changed": "2026-07-10",
+      "status_id": 40,
+      "receipt_id": 507,
+      "cf_part_81": "Bearings",
+      "cf_part_82": "2.40"
+    },
+    {
+      "order_num": "TO-0335",
+      "order_type": "TO",
+      "order_type_id": 40,
+      "source_name": "Fab Shop",
+      "part_num": "PLT-38",
+      "description": "Plate 3/8in A36 24x24",
+      "qty": 12,
+      "uom": "ea",
+      "total_cost": 306.0,
+      "unit_cost": 25.5,
+      "landed_cost": 306.0,
+      "difference": 0.0,
+      "date_issued": "2026-07-11",
+      "date_received": "2026-07-19",
+      "bill_date": null,
+      "date_reconciled": null,
+      "date_last_changed": "2026-07-19",
+      "status_id": 30,
+      "receipt_id": 508,
+      "cf_part_81": "Raw steel",
+      "cf_part_82": null
+    }
+  ],
+  "parameters": {},
+  "custom_fields": [
+    {
+      "id": 71,
+      "name": "Source",
+      "type_id": 7,
+      "table_ref": "PO",
+      "table_name": "Purchase Order",
+      "list_id": 12
+    },
+    {
+      "id": 72,
+      "name": "Dock Date",
+      "type_id": 2,
+      "table_ref": "PO",
+      "table_name": "Purchase Order",
+      "list_id": null
+    },
+    {
+      "id": 73,
+      "name": "Inspect",
+      "type_id": 6,
+      "table_ref": "PO",
+      "table_name": "Purchase Order",
+      "list_id": null
+    },
+    {
+      "id": 51,
+      "name": "Region",
+      "type_id": 7,
+      "table_ref": "SO",
+      "table_name": "Sales Order",
+      "list_id": 9
+    },
+    {
+      "id": 81,
+      "name": "Family",
+      "type_id": 1,
+      "table_ref": "Part",
+      "table_name": "Part",
+      "list_id": null
+    },
+    {
+      "id": 82,
+      "name": "Std Cost",
+      "type_id": 3,
+      "table_ref": "Part",
+      "table_name": "Part",
+      "list_id": null
+    }
+  ],
+  "custom_lists": [
+    {
+      "list_id": 12,
+      "name": "Domestic"
+    },
+    {
+      "list_id": 12,
+      "name": "Import"
+    },
+    {
+      "list_id": 9,
+      "name": "Central"
+    },
+    {
+      "list_id": 9,
+      "name": "East"
+    },
+    {
+      "list_id": 9,
+      "name": "West"
+    }
+  ],
+  "user": {
+    "companyName": "Demo Manufacturing Co",
+    "username": "demo",
+    "email": "demo@example.com",
+    "userId": 1,
+    "groups": [
+      "1"
+    ]
+  },
+  "context": {
+    "pluginName": "ILC CloudPages",
+    "moduleName": "Purchase Order",
+    "objectId": 0
+  }
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var badge = document.getElementById('env-badge');
+    setTimeout(function () { if (FB.isDemo) { badge.textContent = 'demo'; badge.className = 'badge text-bg-warning'; } else { badge.remove(); } }, 300);
+});
+</script>
+</body>
+</html>

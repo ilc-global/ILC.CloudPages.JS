@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="Sales by Product">
+    <meta name="fb_description" content="Summary report: a picked custom field also joins the GROUP BY.">
+    <meta name="ilc_page_type" content="report">
+    <title>Sales by Product</title>
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/bootstrap/5.3.3/bootstrap.min.css"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/datatables/1.13.8/dataTables.bootstrap5.min.css"
+          integrity="sha384-ok3J6xA9oQqai5C9ytYveFsBeKgoGk4T+NExsr6hoIKjZdv9SJcmx2mafwUWRNf9" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.bootstrap5.min.css"
+          integrity="sha384-ElnGX1+feu5KEucSXJLJE9peLXQ3kZDXmq9a2q6nS26zB8zJ7j6ZlljCktlrgsUx" crossorigin="anonymous">
+    <link rel="stylesheet" href="../../css/cloudpages.css">
+
+    <script src="https://<ilc-cdn>/vendor/jquery/3.7.1/jquery.min.js"
+            integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables/1.13.8/jquery.dataTables.min.js"
+            integrity="sha384-Udt767MMeKelGRBxaCfxX88YDLbViYdQ7T/gkRoB197Jf+OviZ+lsaRAOpS/MIjf" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables/1.13.8/dataTables.bootstrap5.min.js"
+            integrity="sha384-PgPBH0hy6DTJwu7pTf6bkRqPlf/+pjUBExpr/eIfzszlGYFlF9Wi9VTAJODPhgCO" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/dataTables.buttons.min.js"
+            integrity="sha384-D7Ifmm6VZVyjXndPxbvw6UXiK3Vixw1lgK5y+0pVVaQvzHPCpx8atng0IjL5wdcQ" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.bootstrap5.min.js"
+            integrity="sha384-8Fm9OFhJ1epvcmDiJTZ2SFHHZoCp/xJ8Ld7wG7/aUwGni32fG7LIhsNTFfEtUaSv" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.colVis.min.js"
+            integrity="sha384-dyI79OT6UE9qWK4x3HAQSilUPj6TfmkE8pX6KeBTyrhOaNrk7cbvUZUDMuC8S7/k" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/xlsx/0.20.1/xlsx.full.min.js"
+            integrity="sha384-QCIdq2UMVEoSRhR3ZWZwdz2/pivLowr+eokFMdYyukq7qI26VYRxFa4Nl6FKetmL" crossorigin="anonymous"></script>
+
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
+    <script src="../../js/cloudpages.js"></script>
+</head>
+<body>
+<div class="container-fluid py-3">
+    <header class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">Sales by Product</h4>
+            <span class="text-muted small">Custom fields test page</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div id="cp-controls"></div>
+            <span id="env-badge" class="badge text-bg-secondary"></span>
+        </div>
+    </header>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div id="parametersContainer"></div>
+            <div class="d-flex gap-2 mt-2">
+                <button id="submitButton" class="btn btn-primary">Run</button>
+                <button id="exportBtn" class="btn btn-outline-secondary">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tableContainer"></div>
+</div>
+
+<script id="settings" type="application/json">
+{
+  "load_on_open": false,
+  "page_length": 50,
+  "column_toggles": true,
+  "theme": "auto",
+  "custom_fields": {
+    "so": "SO",
+    "product": "Product"
+  },
+  "demo_sum": [
+    "qty",
+    "revenue"
+  ]
+}
+</script>
+
+<script id="parameters" type="application/json">
+{
+  "product": {
+    "label": "Product contains",
+    "type": "string",
+    "demo_column": "product_num"
+  }
+}
+</script>
+
+<script id="query" type="text/plain">
+SELECT product.num             AS product_num,
+       product.description     AS description,
+       SUM(soitem.qtyOrdered)  AS qty,
+       SUM(soitem.totalPrice)  AS revenue
+       /*cf:select*/
+FROM soitem
+JOIN so ON so.id = soitem.soId
+JOIN product ON product.id = soitem.productId
+WHERE so.statusId IN (20, 25, 60)
+  AND product.num LIKE CONCAT('%', :product, '%')      /*opt:product*/
+  /*cf:where*/
+GROUP BY product.num, product.description
+         /*cf:group*/
+ORDER BY product.num
+</script>
+
+<script id="columns" type="application/json">
+{
+  "product_num": {
+    "label": "Product"
+  },
+  "description": {
+    "label": "Description"
+  },
+  "qty": {
+    "label": "Qty",
+    "format": "number"
+  },
+  "revenue": {
+    "label": "Revenue",
+    "format": "currency"
+  }
+}
+</script>
+
+<script id="demo" type="application/json">
+{
+  "query": [
+    {
+      "product_num": "DEMO-WIDGET",
+      "description": "Example widget, blue",
+      "qty": 64,
+      "revenue": 1152.0,
+      "cf_so_51": "West",
+      "cf_product_61": 12,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "24.99"
+    },
+    {
+      "product_num": "DEMO-CABLE",
+      "description": "Example cable, 2 m",
+      "qty": 96,
+      "revenue": 576.0,
+      "cf_so_51": "West",
+      "cf_product_61": 48,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "8.50"
+    },
+    {
+      "product_num": "DEMO-GADGET",
+      "description": "Example gadget, large",
+      "qty": 12,
+      "revenue": 708.0,
+      "cf_so_51": "East",
+      "cf_product_61": 6,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "79.00"
+    },
+    {
+      "product_num": "DEMO-BRACKET",
+      "description": "Example bracket, steel",
+      "qty": 48,
+      "revenue": 187.2,
+      "cf_so_51": "East",
+      "cf_product_61": 24,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "5.25"
+    },
+    {
+      "product_num": "DEMO-GADGET",
+      "description": "Example gadget, large",
+      "qty": 6,
+      "revenue": 354.0,
+      "cf_so_51": "West",
+      "cf_product_61": 6,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "79.00"
+    },
+    {
+      "product_num": "DEMO-CABLE",
+      "description": "Example cable, 2 m",
+      "qty": 144,
+      "revenue": 864.0,
+      "cf_so_51": "Central",
+      "cf_product_61": 48,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "8.50"
+    },
+    {
+      "product_num": "DEMO-BRACKET",
+      "description": "Example bracket, steel",
+      "qty": 72,
+      "revenue": 280.8,
+      "cf_so_51": "Central",
+      "cf_product_61": 24,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "5.25"
+    },
+    {
+      "product_num": "DEMO-WIDGET",
+      "description": "Example widget, blue",
+      "qty": 60,
+      "revenue": 1080.0,
+      "cf_so_51": "East",
+      "cf_product_61": 12,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "24.99"
+    },
+    {
+      "product_num": "DEMO-GADGET",
+      "description": "Example gadget, large",
+      "qty": 3,
+      "revenue": 177.0,
+      "cf_so_51": null,
+      "cf_product_61": 6,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "79.00"
+    },
+    {
+      "product_num": "DEMO-CABLE",
+      "description": "Example cable, 2 m",
+      "qty": 48,
+      "revenue": 288.0,
+      "cf_so_51": null,
+      "cf_product_61": 48,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "8.50"
+    }
+  ],
+  "custom_fields": [
+    {
+      "id": 51,
+      "name": "Region",
+      "type_id": 7,
+      "table_ref": "SO",
+      "table_name": "Sales Order",
+      "list_id": 9
+    },
+    {
+      "id": 61,
+      "name": "Case Pack",
+      "type_id": 5,
+      "table_ref": "Product",
+      "table_name": "Product",
+      "list_id": null
+    },
+    {
+      "id": 62,
+      "name": "Brand",
+      "type_id": 1,
+      "table_ref": "Product",
+      "table_name": "Product",
+      "list_id": null
+    },
+    {
+      "id": 63,
+      "name": "MSRP",
+      "type_id": 3,
+      "table_ref": "Product",
+      "table_name": "Product",
+      "list_id": null
+    }
+  ],
+  "user": {
+    "companyName": "Demo Co",
+    "username": "demo"
+  },
+  "custom_lists": [
+    {
+      "list_id": 9,
+      "name": "Central"
+    },
+    {
+      "list_id": 9,
+      "name": "East"
+    },
+    {
+      "list_id": 9,
+      "name": "West"
+    }
+  ]
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var badge = document.getElementById('env-badge');
+    setTimeout(function () { if (FB.isDemo) { badge.textContent = 'demo'; badge.className = 'badge text-bg-warning'; } else { badge.remove(); } }, 300);
+});
+</script>
+</body>
+</html>

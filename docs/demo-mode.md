@@ -37,6 +37,9 @@ deployment may be intentional).
 - `parameters.<name>` — rows for that parameter's SQL (dropdown/autocomplete),
   keyed by parameter name, not SQL text.
 - `user` / `context` — optional, passed through to fb.js demo config.
+- `custom_fields` / `custom_lists` — optional, the custom field definitions
+  and list items for a report that sets `custom_fields`. See
+  [Custom Fields](custom-fields.md#demo-mode).
 
 ## How filtering works
 

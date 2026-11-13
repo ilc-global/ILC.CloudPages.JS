@@ -62,6 +62,16 @@
         settings.size = settings.size || (settings.dense ? 's' : 'm');   // s=dense, m=normal, l=large
         settings.theme = settings.theme || 'auto';
 
+        // Custom fields: { "<sql alias>": "<tablereference.tableRefName>" }.
+        // The alias is written into generated SQL, so it must be a plain identifier.
+        if (settings.custom_fields) {
+            Object.keys(settings.custom_fields).forEach(function (alias) {
+                if (!CF_ALIAS_RE.test(alias)) {
+                    throw new Error('CloudPages: custom_fields alias "' + alias + '" is not a plain SQL identifier.');
+                }
+            });
+        }
+
         _config = { settings: settings, parameters: parameters, query: query, columns: columns };
         return _config;
     }
@@ -1269,7 +1279,7 @@
      * so Excel can sort, filter, and pivot them natively.
      */
     function buildWorkbook(rows) {
-        var columns = (_config && _config.columns) || {};
+        var columns = cfColumns((_config && _config.columns) || {});
         var data = rows.map(function (row) {
             var out = {};
             Object.keys(row).forEach(function (k) {
@@ -1446,6 +1456,646 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // [7b] Custom Fields
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // settings.custom_fields maps a SQL alias to a Fishbowl table:
+    //     "custom_fields": { "so": "SO", "product": "Product" }
+    // The #query carries up to three markers:
+    //     /*cf:select*/   after the last SELECT column
+    //     /*cf:group*/    after the last GROUP BY expression (summary reports)
+    //     /*cf:where*/    among the WHERE conditions
+    // In a UNION, each branch lists the aliases it has: /*cf:select po part*/.
+    // A chosen field from any other record is written as NULL in that branch,
+    // as a column and inside a filter condition.
+    // Nothing chosen: the markers are removed and no custom field is read.
+    // A column adds CustomFieldById(<alias>.customFields, :id) at the select
+    // and group markers. Filters add one AND ( ... ) block at the where
+    // marker. Field ids and filter values are bound, never joined in.
+    // Definitions load when the dialog first opens, not on page open.
+
+    var CF_ALIAS_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    var CF_KEY_RE = /^cf_[A-Za-z_][A-Za-z0-9_]*_\d+$/;
+    var CF_DEFS_SQL = 'SELECT cf.id AS id, cf.name AS name, cf.customFieldTypeId AS type_id, ' +
+        'cf.listId AS list_id, tr.tableRefName AS table_ref, tr.displayName AS table_name ' +
+        'FROM customfield cf JOIN tablereference tr ON tr.tableId = cf.tableId ' +
+        'WHERE cf.activeFlag = 1 AND tr.tableRefName IN (:cf_tables) ' +
+        'ORDER BY tr.displayName, cf.sortOrder, cf.name';
+    var CF_LISTS_SQL = 'SELECT cli.listId AS list_id, cli.name AS name FROM customlistitem cli ' +
+        'WHERE cli.listId IN (:cf_lists) ORDER BY cli.name';
+    var CF_TYPE_FORMAT = { 2: 'date', 3: 'currency', 4: 'number', 5: 'number' };
+
+    // customfieldtype: 1 Text, 2 Date, 3 Money, 4 Quantity, 5 Count,
+    // 6 Checkbox, 7 Drop-Down List, 9 Long Text, 10 URL.
+    function cfKind(typeId) {
+        if (typeId === 2) return 'date';
+        if (typeId === 3 || typeId === 4 || typeId === 5) return 'number';
+        if (typeId === 6) return 'checkbox';
+        if (typeId === 7) return 'list';
+        return 'text';
+    }
+
+    var CF_OPS = {
+        text: [['contains', 'contains'], ['not_contains', 'does not contain'], ['eq', 'is'], ['ne', 'is not'],
+               ['starts', 'starts with'], ['empty', 'is empty'], ['not_empty', 'is not empty']],
+        number: [['eq', '='], ['ne', '≠'], ['gt', '>'], ['ge', '≥'], ['lt', '<'], ['le', '≤'],
+                 ['between', 'is between'], ['empty', 'is empty'], ['not_empty', 'is not empty']],
+        date: [['eq', 'is'], ['lt', 'is before'], ['gt', 'is after'], ['between', 'is between'],
+               ['empty', 'is empty'], ['not_empty', 'is not empty']],
+        list: [['eq', 'is'], ['ne', 'is not'], ['empty', 'is empty'], ['not_empty', 'is not empty']],
+        checkbox: [['checked', 'is checked'], ['unchecked', 'is not checked']]
+    };
+    var CF_CMP = { eq: '=', ne: '<>', gt: '>', ge: '>=', lt: '<', le: '<=' };
+    var CF_TRUE = ['true', '1', 'yes'];
+
+    function cfOpArity(op) {
+        if (op === 'empty' || op === 'not_empty' || op === 'checked' || op === 'unchecked') return 0;
+        return op === 'between' ? 2 : 1;
+    }
+
+    function cfOpLabel(kind, op) {
+        var found = (CF_OPS[kind] || []).filter(function (o) { return o[0] === op; })[0];
+        return found ? found[1] : op;
+    }
+
+    function cfFilterComplete(f) {
+        var n = cfOpArity(f.op);
+        if (n >= 1 && (f.value === undefined || f.value === null || f.value === '')) return false;
+        if (n === 2 && (f.value2 === undefined || f.value2 === null || f.value2 === '')) return false;
+        return true;
+    }
+
+    // columns: [field]   filters: [{ join: 'AND'|'OR', field, op, value, value2 }]
+    // field:   { alias, id, name, typeId, listId, tableName }
+    var _cf = { defs: null, lists: {}, loading: null, columns: [], filters: [] };
+
+    function cfKey(alias, id) { return 'cf_' + alias + '_' + id; }
+    function cfFieldKey(f) { return cfKey(f.alias, f.id); }
+    function cfFieldLabel(f) { return f.tableName + ': ' + f.name; }
+    function cfState() { return { columns: _cf.columns.slice(), filters: _cf.filters.filter(cfFilterComplete) }; }
+    function cfFieldOk(f) { return f && CF_ALIAS_RE.test(f.alias) && !isNaN(parseInt(f.id, 10)); }
+
+    function cfLoadDefinitions(settings) {
+        if (_cf.defs) return Promise.resolve(_cf.defs);
+        if (_cf.loading) return _cf.loading;
+        var map = settings.custom_fields;
+        var tables = [];
+        Object.keys(map).forEach(function (a) { if (tables.indexOf(map[a]) < 0) tables.push(map[a]); });
+        function run(sql, values) {
+            var bound = FB.isDemo ? { sql: sql, bindings: values } : bindParams(sql, values);
+            return FB.queryAsync(bound.sql, bound.bindings);
+        }
+        _cf.loading = run(CF_DEFS_SQL, { cf_tables: tables }).then(function (rows) {
+            var defs = [];
+            Object.keys(map).forEach(function (alias) {
+                (rows || []).forEach(function (r) {
+                    if (String(r.table_ref) !== String(map[alias])) return;
+                    var listId = parseInt(r.list_id, 10);
+                    defs.push({
+                        alias: alias, id: parseInt(r.id, 10), name: String(r.name),
+                        typeId: parseInt(r.type_id, 10), listId: isNaN(listId) ? null : listId,
+                        tableName: r.table_name || r.table_ref
+                    });
+                });
+            });
+            var listIds = [];
+            defs.forEach(function (d) {
+                if (cfKind(d.typeId) === 'list' && d.listId !== null && listIds.indexOf(d.listId) < 0) listIds.push(d.listId);
+            });
+            if (!listIds.length) return defs;
+            // A list whose items do not load falls back to a text box.
+            return run(CF_LISTS_SQL, { cf_lists: listIds }).then(function (items) {
+                (items || []).forEach(function (it) {
+                    var id = parseInt(it.list_id, 10);
+                    if (listIds.indexOf(id) < 0) return;
+                    (_cf.lists[id] = _cf.lists[id] || []).push(String(it.name));
+                });
+                return defs;
+            }, function (err) {
+                console.warn('CloudPages: custom list items did not load:', err);
+                return defs;
+            });
+        }).then(function (defs) {
+            _cf.defs = defs;
+            _cf.loading = null;
+            return defs;
+        }, function (err) { _cf.loading = null; throw err; });
+        return _cf.loading;
+    }
+
+    // One filter as SQL. `n` is the bind-name stem for this filter.
+    // absent: this part of the query does not have the field's record (a
+    // UNION branch). The field reads as NULL there, so the same condition is
+    // written against NULL.
+    function cfConditionSql(f, n, bindings, absent) {
+        var expr = absent ? 'NULL' : 'CustomFieldById(' + f.field.alias + '.customFields, :' + n + '_id)';
+        if (!absent) bindings[n + '_id'] = String(parseInt(f.field.id, 10));
+        var kind = cfKind(f.field.typeId);
+        var v = ':' + n + '_v', v2 = ':' + n + '_v2';
+        var arity = cfOpArity(f.op);
+        if (arity >= 1) bindings[n + '_v'] = String(f.value);
+        if (arity === 2) bindings[n + '_v2'] = String(f.value2);
+
+        switch (f.op) {
+            case 'empty': return '(' + expr + " IS NULL OR " + expr + " = '')";
+            case 'not_empty': return '(' + expr + " IS NOT NULL AND " + expr + " <> '')";
+            case 'checked': return 'LOWER(' + expr + ") IN ('" + CF_TRUE.join("', '") + "')";
+            case 'unchecked': return '(' + expr + ' IS NULL OR LOWER(' + expr + ") NOT IN ('" + CF_TRUE.join("', '") + "'))";
+            case 'contains': return expr + " LIKE CONCAT('%', " + v + ", '%')";
+            case 'not_contains': return '(' + expr + ' IS NULL OR ' + expr + " NOT LIKE CONCAT('%', " + v + ", '%'))";
+            case 'starts': return expr + ' LIKE CONCAT(' + v + ", '%')";
+        }
+        var lhs = expr, r1 = v, r2 = v2;
+        if (kind === 'number') {
+            lhs = 'CAST(' + expr + ' AS DECIMAL(28,9))';
+            r1 = 'CAST(' + v + ' AS DECIMAL(28,9))';
+            r2 = 'CAST(' + v2 + ' AS DECIMAL(28,9))';
+        } else if (kind === 'date') {
+            lhs = 'DATE(' + expr + ')';
+        }
+        var cmp = f.op === 'between'
+            ? lhs + ' >= ' + r1 + ' AND ' + lhs + ' <= ' + r2
+            : lhs + ' ' + (CF_CMP[f.op] || '=') + ' ' + r1;
+        if (f.op === 'ne') return '(' + expr + ' IS NULL OR ' + cmp + ')';
+        // A blank number must not compare as zero.
+        if (kind === 'number') return '(' + expr + " <> '' AND " + cmp + ')';
+        return f.op === 'between' ? '(' + cmp + ')' : cmp;
+    }
+
+    // AND binds tighter than OR: a run of AND filters is one group, and OR
+    // starts the next group.
+    function cfGroups(filters) {
+        var groups = [];
+        filters.forEach(function (f, i) {
+            if (i === 0 || f.join === 'OR') groups.push([]);
+            groups[groups.length - 1].push(f);
+        });
+        return groups;
+    }
+
+    var CF_MARKER_RE = /\/\*cf:(select|group|where)((?:[ \t]+[A-Za-z_][A-Za-z0-9_]*)*)[ \t]*\*\//g;
+
+    function expandCustomFields(sql, state) {
+        state = state || cfState();
+        var bindings = {};
+        var columns = (state.columns || []).filter(cfFieldOk);
+        var filters = (state.filters || []).filter(function (f) { return cfFieldOk(f.field) && cfFilterComplete(f); });
+
+        sql = sql.replace(CF_MARKER_RE, function (m, kind, list) {
+            // A marker that lists aliases says which records this part of the
+            // query has. No list means it has all of them.
+            var has = null;
+            if (list && list.trim()) {
+                has = {};
+                list.trim().split(/\s+/).forEach(function (a) { has[a] = true; });
+            }
+            function present(alias) { return !has || has[alias] === true; }
+
+            if (kind === 'where') {
+                if (!filters.length) return '';
+                var n = 0;
+                var parts = cfGroups(filters).map(function (g) {
+                    var conds = g.map(function (f) {
+                        return cfConditionSql(f, 'cf_f' + (n++), bindings, !present(f.field.alias));
+                    });
+                    return conds.length > 1 ? '(' + conds.join(' AND ') + ')' : conds[0];
+                });
+                return '  AND (' + parts.join('\n       OR ') + ')';
+            }
+            var lines = [];
+            columns.forEach(function (c) {
+                var key = cfFieldKey(c);
+                if (!present(c.alias)) {
+                    // Keep the UNION branches the same width.
+                    if (kind === 'select') lines.push('     , NULL AS ' + key);
+                    return;
+                }
+                var expr = 'CustomFieldById(' + c.alias + '.customFields, :' + key + '_id)';
+                bindings[key + '_id'] = String(parseInt(c.id, 10));
+                lines.push('     , ' + expr + (kind === 'select' ? ' AS ' + key : ''));
+            });
+            return lines.join('\n');
+        });
+        return { sql: sql, bindings: bindings };
+    }
+
+    // The same filter, applied to a demo row.
+    function cfDemoMatch(row, f) {
+        var raw = row[cfFieldKey(f.field)];
+        var blank = raw === undefined || raw === null || raw === '';
+        var cell = blank ? '' : String(raw);
+        var kind = cfKind(f.field.typeId);
+        switch (f.op) {
+            case 'empty': return blank;
+            case 'not_empty': return !blank;
+            case 'checked': return CF_TRUE.indexOf(cell.toLowerCase()) >= 0;
+            case 'unchecked': return CF_TRUE.indexOf(cell.toLowerCase()) < 0;
+            case 'contains': return cell.toLowerCase().indexOf(String(f.value).toLowerCase()) >= 0;
+            case 'not_contains': return cell.toLowerCase().indexOf(String(f.value).toLowerCase()) < 0;
+            case 'starts': return cell.toLowerCase().indexOf(String(f.value).toLowerCase()) === 0;
+        }
+        if (f.op === 'ne') {
+            return blank || (kind === 'number' ? parseFloat(cell) !== parseFloat(f.value)
+                : cell.toLowerCase() !== String(f.value).toLowerCase());
+        }
+        if (blank) return false;
+        var a, b, c;
+        if (kind === 'number') { a = parseFloat(cell); b = parseFloat(f.value); c = parseFloat(f.value2); }
+        else if (kind === 'date') { a = cell.slice(0, 10); b = String(f.value); c = String(f.value2); }
+        else { a = cell.toLowerCase(); b = String(f.value).toLowerCase(); c = String(f.value2 || '').toLowerCase(); }
+        switch (f.op) {
+            case 'eq': return a === b;
+            case 'gt': return a > b;
+            case 'ge': return a >= b;
+            case 'lt': return a < b;
+            case 'le': return a <= b;
+            case 'between': return a >= b && a <= c;
+        }
+        return true;
+    }
+
+    // Demo rows carry every custom field as a cf_<alias>_<id> key. Apply the
+    // filters, drop the fields that are not columns, and (summary reports)
+    // re-sum the settings.demo_sum columns over what is left.
+    function cfDemoApply(rows, state, settings) {
+        if (!settings || !settings.custom_fields) return rows;
+        var keep = {};
+        state.columns.forEach(function (c) { keep[cfFieldKey(c)] = true; });
+        var groups = cfGroups(state.filters);
+        rows = (rows || []).filter(function (row) {
+            if (!groups.length) return true;
+            return groups.some(function (g) { return g.every(function (f) { return cfDemoMatch(row, f); }); });
+        }).map(function (row) {
+            var out = {};
+            Object.keys(row).forEach(function (k) {
+                if (!CF_KEY_RE.test(k) || keep[k]) out[k] = row[k];
+            });
+            return out;
+        });
+        var sums = settings.demo_sum;
+        if (!sums || !sums.length) return rows;
+        var index = {}, merged = [];
+        rows.forEach(function (row) {
+            var id = JSON.stringify(Object.keys(row).filter(function (k) { return sums.indexOf(k) < 0; })
+                .map(function (k) { return [k, row[k]]; }));
+            if (!index[id]) { index[id] = Object.assign({}, row); merged.push(index[id]); return; }
+            sums.forEach(function (k) { index[id][k] = (parseFloat(index[id][k]) || 0) + (parseFloat(row[k]) || 0); });
+        });
+        return merged;
+    }
+
+    // The table builds its columns from the keys of the rows. A custom field
+    // that is blank on every row can come back with no key at all, or with
+    // the key in another letter case, and the column would then be missing.
+    // Give every row every chosen column.
+    function cfNormalizeRows(rows, state) {
+        if (!rows || !rows.length || !state.columns.length) return rows;
+        var keys = state.columns.map(cfFieldKey);
+        rows.forEach(function (row) {
+            var lower = null;
+            keys.forEach(function (key) {
+                if (key in row) return;
+                if (!lower) {
+                    lower = {};
+                    Object.keys(row).forEach(function (k) { lower[k.toLowerCase()] = k; });
+                }
+                var actual = lower[key.toLowerCase()];
+                if (actual !== undefined) { row[key] = row[actual]; delete row[actual]; }
+                else row[key] = null;
+            });
+        });
+        return rows;
+    }
+
+    function cfColumns(base) {
+        var cols = Object.assign({}, base);
+        _cf.columns.forEach(function (c) {
+            cols[cfFieldKey(c)] = { label: cfFieldLabel(c), format: CF_TYPE_FORMAT[c.typeId] };
+        });
+        return cols;
+    }
+
+    function cfFilterText(f) {
+        var t = cfFieldLabel(f.field) + ' ' + cfOpLabel(cfKind(f.field.typeId), f.op);
+        var n = cfOpArity(f.op);
+        if (n >= 1) t += ' ' + f.value;
+        if (n === 2) t += ' and ' + f.value2;
+        return t;
+    }
+
+    function cfLogicText(filters) {
+        return cfGroups(filters).map(function (g) {
+            var t = g.map(cfFilterText).join(' AND ');
+            return g.length > 1 ? '(' + t + ')' : t;
+        }).join(' OR ');
+    }
+
+    function cfSummaryText() {
+        var st = cfState();
+        if (!st.columns.length && !st.filters.length) return 'None';
+        var parts = [];
+        if (st.columns.length) parts.push('Columns: ' + st.columns.map(cfFieldLabel).join(', '));
+        if (st.filters.length) parts.push('Filters: ' + cfLogicText(st.filters));
+        return parts.join('. ');
+    }
+
+    function cfEl(tag, className, text) {
+        var el = document.createElement(tag);
+        if (className) el.className = className;
+        if (text !== undefined) el.textContent = text;
+        return el;
+    }
+
+    function renderCustomFieldsUI(settings, container) {
+        if (!settings.custom_fields) return;
+        var host = container.querySelector('.cp-param-fields') || container;
+
+        var group = cfEl('div', 'mb-3 cp-span-2 cp-cf');
+        group.appendChild(cfEl('label', 'form-label', 'Custom fields'));
+        var bar = cfEl('div', 'd-flex align-items-center flex-wrap gap-2');
+        var btn = cfEl('button', 'btn btn-outline-secondary btn-sm', 'Edit custom fields');
+        btn.type = 'button';
+        btn.id = 'cp-cf-toggle';
+        var summary = cfEl('span', 'text-muted small');
+        summary.id = 'cp-cf-summary';
+        bar.appendChild(btn);
+        bar.appendChild(summary);
+        group.appendChild(bar);
+        host.appendChild(group);
+
+        function refresh() { summary.textContent = cfSummaryText(); }
+        btn.addEventListener('click', function () { cfOpenDialog(settings, refresh); });
+        refresh();
+    }
+
+    // The dialog edits a draft. Apply commits it; Cancel and Esc discard it.
+    function cfOpenDialog(settings, onApply) {
+        var dlg = document.getElementById('cp-cf-dialog');
+        if (!dlg) {
+            dlg = cfEl('dialog', 'cp-cf-dialog');
+            dlg.id = 'cp-cf-dialog';
+            dlg.setAttribute('aria-labelledby', 'cp-cf-title');
+            document.body.appendChild(dlg);
+        }
+        dlg.innerHTML = '';
+
+        var head = cfEl('div', 'cp-cf-head d-flex justify-content-between align-items-center');
+        var title = cfEl('h5', 'mb-0', 'Custom fields');
+        title.id = 'cp-cf-title';
+        var x = cfEl('button', 'btn-close');
+        x.type = 'button';
+        x.setAttribute('aria-label', 'Close');
+        head.appendChild(title);
+        head.appendChild(x);
+
+        var body = cfEl('div', 'cp-cf-body', 'Loading custom fields…');
+        body.id = 'cp-cf-body';
+
+        var foot = cfEl('div', 'cp-cf-foot d-flex justify-content-end align-items-center flex-wrap gap-2');
+        var actions = cfEl('div', 'd-flex gap-2');
+        var cancel = cfEl('button', 'btn btn-outline-secondary', 'Cancel');
+        cancel.type = 'button';
+        cancel.id = 'cp-cf-cancel';
+        var apply = cfEl('button', 'btn btn-primary', 'Apply');
+        apply.type = 'button';
+        apply.id = 'cp-cf-apply';
+        apply.disabled = true;
+        actions.appendChild(cancel);
+        actions.appendChild(apply);
+        foot.appendChild(actions);
+
+        dlg.appendChild(head);
+        dlg.appendChild(body);
+        dlg.appendChild(foot);
+
+        function close() { if (dlg.open) dlg.close(); }
+        x.addEventListener('click', close);
+        cancel.addEventListener('click', close);
+        if (!dlg.open) dlg.showModal();
+
+        cfLoadDefinitions(settings).then(function (defs) {
+            cfBuildDialogBody(body, defs, apply, function () { close(); onApply(); });
+        }).catch(function (err) {
+            console.error('CloudPages: custom field definitions failed:', err);
+            body.innerHTML = '';
+            body.appendChild(cfEl('p', 'text-danger mb-0', 'Custom fields did not load: ' + ((err && err.message) || err)));
+        });
+    }
+
+    function cfBuildDialogBody(body, defs, apply, done) {
+        body.innerHTML = '';
+        var byKey = {};
+        defs.forEach(function (d) { byKey[cfFieldKey(d)] = d; });
+        // A chosen column that no longer exists is dropped.
+        _cf.columns = _cf.columns.filter(function (c) { return byKey[cfFieldKey(c)]; });
+
+        if (!defs.length) {
+            body.appendChild(cfEl('p', 'text-muted mb-0', 'This report has no custom fields to add.'));
+            return;
+        }
+
+        var draftCols = {};
+        _cf.columns.forEach(function (c) { draftCols[cfFieldKey(c)] = true; });
+        var draft = _cf.filters.filter(function (f) { return byKey[cfFieldKey(f.field)]; }).map(function (f) {
+            return { join: f.join, key: cfFieldKey(f.field), op: f.op, value: f.value, value2: f.value2 };
+        });
+
+        // ---- Columns
+        body.appendChild(cfEl('h6', '', 'Columns'));
+        body.appendChild(cfEl('p', 'text-muted small mb-2', 'Add a field to the report as a column.'));
+        var colBox = cfEl('div', 'cp-cf-cols mb-4');
+        defs.forEach(function (d) {
+            var key = cfFieldKey(d);
+            var wrap = cfEl('div', 'form-check');
+            var cb = cfEl('input', 'form-check-input');
+            cb.type = 'checkbox';
+            cb.id = 'cp-cf-show-' + key;
+            cb.checked = !!draftCols[key];
+            cb.addEventListener('change', function () { draftCols[key] = cb.checked; });
+            var lab = cfEl('label', 'form-check-label', cfFieldLabel(d));
+            lab.setAttribute('for', cb.id);
+            wrap.appendChild(cb);
+            wrap.appendChild(lab);
+            colBox.appendChild(wrap);
+        });
+        body.appendChild(colBox);
+
+        // ---- Filters
+        body.appendChild(cfEl('h6', '', 'Filters'));
+        body.appendChild(cfEl('p', 'text-muted small mb-2', 'Keep only the rows that match. AND is applied before OR.'));
+        var rowsBox = cfEl('div', 'cp-cf-rows');
+        rowsBox.id = 'cp-cf-rows';
+        body.appendChild(rowsBox);
+        var add = cfEl('button', 'btn btn-outline-secondary btn-sm mt-1', 'Add filter');
+        add.type = 'button';
+        add.id = 'cp-cf-add';
+        body.appendChild(add);
+        var logic = cfEl('p', 'small mt-3 mb-0');
+        logic.id = 'cp-cf-logic';
+        body.appendChild(logic);
+        var error = cfEl('p', 'text-danger small mt-2 mb-0');
+        error.id = 'cp-cf-error';
+        error.hidden = true;
+        body.appendChild(error);
+
+        function asFilter(f) {
+            return { join: f.join, field: byKey[f.key], op: f.op, value: f.value, value2: f.value2 };
+        }
+
+        function updateLogic() {
+            var complete = draft.map(asFilter).filter(cfFilterComplete);
+            logic.textContent = complete.length ? 'Rows where ' + cfLogicText(complete) : '';
+        }
+
+        function valueInput(f, prop, d, index) {
+            var kind = cfKind(d.typeId);
+            var el;
+            var items = kind === 'list' && d.listId !== null ? _cf.lists[d.listId] : null;
+            if (items && items.length) {
+                el = cfEl('select', 'form-select form-select-sm');
+                var blank = cfEl('option', '', 'Choose a value');
+                blank.value = '';
+                el.appendChild(blank);
+                items.forEach(function (name) {
+                    var o = cfEl('option', '', name);
+                    o.value = name;
+                    el.appendChild(o);
+                });
+            } else {
+                el = cfEl('input', 'form-control form-control-sm');
+                el.type = kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text';
+                if (kind === 'number') el.step = 'any';
+            }
+            el.value = f[prop] === undefined || f[prop] === null ? '' : f[prop];
+            el.setAttribute('aria-label', cfFieldLabel(d) + (prop === 'value2' ? ' upper value' : ' value'));
+            el.setAttribute('data-cf-row', String(index));
+            el.setAttribute('data-cf-prop', prop);
+            el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', function () {
+                f[prop] = el.value.trim();
+                el.classList.remove('is-invalid');
+                updateLogic();
+            });
+            return el;
+        }
+
+        function renderRows() {
+            rowsBox.innerHTML = '';
+            if (!draft.length) rowsBox.appendChild(cfEl('p', 'text-muted small mb-2', 'No filters.'));
+            draft.forEach(function (f, i) {
+                var d = byKey[f.key];
+                var kind = cfKind(d.typeId);
+                var row = cfEl('div', 'cp-cf-row');
+
+                var joinCell = cfEl('div', 'cp-cf-join');
+                if (i === 0) {
+                    joinCell.appendChild(cfEl('span', 'small text-muted', 'Where'));
+                } else {
+                    var join = cfEl('select', 'form-select form-select-sm');
+                    join.setAttribute('aria-label', 'Combine with the filter above');
+                    ['AND', 'OR'].forEach(function (j) {
+                        var o = cfEl('option', '', j);
+                        o.value = j;
+                        join.appendChild(o);
+                    });
+                    join.value = f.join === 'OR' ? 'OR' : 'AND';
+                    join.addEventListener('change', function () { f.join = join.value; updateLogic(); });
+                    joinCell.appendChild(join);
+                }
+
+                var field = cfEl('select', 'form-select form-select-sm cp-cf-field');
+                field.setAttribute('aria-label', 'Field');
+                var groups = {};
+                defs.forEach(function (def) {
+                    var og = groups[def.tableName];
+                    if (!og) {
+                        og = groups[def.tableName] = document.createElement('optgroup');
+                        og.label = def.tableName;
+                        field.appendChild(og);
+                    }
+                    var o = cfEl('option', '', def.name);
+                    o.value = cfFieldKey(def);
+                    og.appendChild(o);
+                });
+                field.value = f.key;
+                field.addEventListener('change', function () {
+                    f.key = field.value;
+                    f.op = CF_OPS[cfKind(byKey[f.key].typeId)][0][0];
+                    f.value = '';
+                    f.value2 = '';
+                    renderRows();
+                });
+
+                var op = cfEl('select', 'form-select form-select-sm cp-cf-op');
+                op.setAttribute('aria-label', 'Condition');
+                CF_OPS[kind].forEach(function (o) {
+                    var opt = cfEl('option', '', o[1]);
+                    opt.value = o[0];
+                    op.appendChild(opt);
+                });
+                op.value = f.op;
+                op.addEventListener('change', function () { f.op = op.value; renderRows(); });
+
+                var values = cfEl('div', 'cp-cf-values');
+                var arity = cfOpArity(f.op);
+                if (arity >= 1) values.appendChild(valueInput(f, 'value', d, i));
+                if (arity === 2) {
+                    values.appendChild(cfEl('span', 'small text-muted', 'and'));
+                    values.appendChild(valueInput(f, 'value2', d, i));
+                }
+
+                var remove = cfEl('button', 'btn btn-outline-secondary btn-sm', 'Remove');
+                remove.type = 'button';
+                remove.setAttribute('aria-label', 'Remove this filter');
+                remove.addEventListener('click', function () { draft.splice(i, 1); renderRows(); });
+
+                row.appendChild(joinCell);
+                row.appendChild(field);
+                row.appendChild(op);
+                row.appendChild(values);
+                row.appendChild(remove);
+                rowsBox.appendChild(row);
+            });
+            error.hidden = true;
+            updateLogic();
+        }
+
+        add.addEventListener('click', function () {
+            var first = defs[0];
+            draft.push({ join: 'AND', key: cfFieldKey(first), op: CF_OPS[cfKind(first.typeId)][0][0], value: '', value2: '' });
+            renderRows();
+        });
+
+        apply.disabled = false;
+        apply.addEventListener('click', function () {
+            var bad = false;
+            draft.forEach(function (f, i) {
+                if (cfFilterComplete(asFilter(f))) return;
+                bad = true;
+                var inputs = rowsBox.querySelectorAll('[data-cf-row="' + i + '"]');
+                Array.prototype.forEach.call(inputs, function (el) { if (!el.value) el.classList.add('is-invalid'); });
+            });
+            if (bad) {
+                error.textContent = 'Enter a value for each filter, or remove the filter.';
+                error.hidden = false;
+                return;
+            }
+            _cf.columns = defs.filter(function (d) { return draftCols[cfFieldKey(d)]; });
+            _cf.filters = draft.map(asFilter);
+            done();
+        });
+
+        renderRows();
+    }
+
+    CloudPages.customFields = {
+        expand: expandCustomFields,
+        state: cfState,
+        summary: cfSummaryText,
+        definitionsSql: CF_DEFS_SQL,
+        listsSql: CF_LISTS_SQL
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
     // [8] Query Execution
     // ═══════════════════════════════════════════════════════════════════
 
@@ -1458,9 +2108,19 @@
         // Demo mode: keep the original SQL text (so the DemoAdapter can match
         // it to the #query tag) and pass raw values — arrays and ranges intact
         // for the generated demo filter (see Demo Mode section).
-        var bound = FB.isDemo
-            ? { sql: sql, bindings: values }
-            : bindParams(pruneOptionalClauses(sql, values), values);
+        // Custom fields: the /*cf:...*/ markers are expanded from the user's
+        // picks, or removed when nothing is picked. Demo keeps the SQL text
+        // unchanged and applies the picks to the demo rows instead.
+        var cfSt = cfState();
+        var cfSettings = (_config && _config.settings) || {};
+        var bound;
+        if (FB.isDemo) {
+            bound = { sql: sql, bindings: values };
+        } else {
+            var cf = expandCustomFields(sql, cfSt);
+            var allValues = Object.assign({}, values, cf.bindings);
+            bound = bindParams(pruneOptionalClauses(cf.sql, allValues), allValues);
+        }
 
         FB.setStatus('Running query...');
         FB.setProgress(-1);
@@ -1469,6 +2129,8 @@
         FB.queryAsync(bound.sql, bound.bindings).then(function (rows) {
             FB.setStatus('');
             FB.setProgress(0);
+            if (FB.isDemo) rows = cfDemoApply(rows, cfSt, cfSettings);
+            rows = cfNormalizeRows(rows, cfSt);
             rows = CloudPages.hooks.onAfterQuery(rows);
             callback(null, rows);
         }).catch(function (err) {
@@ -1524,6 +2186,8 @@
                 }
             });
             queries[config.query.trim()] = makeDemoQueryFn(demo.query || [], config.parameters);
+            if (demo.custom_fields) queries[CF_DEFS_SQL] = demo.custom_fields;
+            if (demo.custom_lists) queries[CF_LISTS_SQL] = demo.custom_lists;
             FB.configure({
                 environment: 'demo',
                 demoData: { queries: queries, user: demo.user, context: demo.context }
@@ -1607,6 +2271,7 @@
         var paramContainer = document.getElementById('parametersContainer');
         if (paramContainer) {
             renderParameters(config.parameters, paramContainer, config.settings);
+            renderCustomFieldsUI(config.settings, paramContainer);
         }
 
         // Submit button
@@ -1621,6 +2286,9 @@
                     timestamp: new Date().toLocaleString(),
                     params: parameterSummary(config.parameters)
                 };
+                if (config.settings.custom_fields) {
+                    _lastRunMeta.params.push({ label: 'Custom fields', value: cfSummaryText() });
+                }
                 executeQuery(config.query, values, function (err, rows) {
                     if (err) {
                         console.error('CloudPages: query error:', err);
@@ -1628,7 +2296,7 @@
                         if (container) container.innerHTML = '<p class="text-danger">Query error: ' + (err.message || err) + '</p>';
                         return;
                     }
-                    renderTable(rows, config.columns, config.settings);
+                    renderTable(rows, cfColumns(config.columns), config.settings);
                     var panel = document.querySelector('.cp-param-panel');
                     if (panel) panel.open = false;
                 });
