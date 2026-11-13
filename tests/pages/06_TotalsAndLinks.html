@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="fb_title" content="Totals and Links">
+    <meta name="fb_description" content="Detail report with custom fields the user picks.">
+    <meta name="ilc_page_type" content="report">
+    <title>Totals and Links</title>
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/bootstrap/5.3.3/bootstrap.min.css"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/datatables/1.13.8/dataTables.bootstrap5.min.css"
+          integrity="sha384-ok3J6xA9oQqai5C9ytYveFsBeKgoGk4T+NExsr6hoIKjZdv9SJcmx2mafwUWRNf9" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.bootstrap5.min.css"
+          integrity="sha384-ElnGX1+feu5KEucSXJLJE9peLXQ3kZDXmq9a2q6nS26zB8zJ7j6ZlljCktlrgsUx" crossorigin="anonymous">
+    <link rel="stylesheet" href="../../css/cloudpages.css">
+
+    <script src="https://<ilc-cdn>/vendor/jquery/3.7.1/jquery.min.js"
+            integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables/1.13.8/jquery.dataTables.min.js"
+            integrity="sha384-Udt767MMeKelGRBxaCfxX88YDLbViYdQ7T/gkRoB197Jf+OviZ+lsaRAOpS/MIjf" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables/1.13.8/dataTables.bootstrap5.min.js"
+            integrity="sha384-PgPBH0hy6DTJwu7pTf6bkRqPlf/+pjUBExpr/eIfzszlGYFlF9Wi9VTAJODPhgCO" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/dataTables.buttons.min.js"
+            integrity="sha384-D7Ifmm6VZVyjXndPxbvw6UXiK3Vixw1lgK5y+0pVVaQvzHPCpx8atng0IjL5wdcQ" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.bootstrap5.min.js"
+            integrity="sha384-8Fm9OFhJ1epvcmDiJTZ2SFHHZoCp/xJ8Ld7wG7/aUwGni32fG7LIhsNTFfEtUaSv" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/datatables-buttons/2.4.2/buttons.colVis.min.js"
+            integrity="sha384-dyI79OT6UE9qWK4x3HAQSilUPj6TfmkE8pX6KeBTyrhOaNrk7cbvUZUDMuC8S7/k" crossorigin="anonymous"></script>
+    <script src="https://<ilc-cdn>/vendor/xlsx/0.20.1/xlsx.full.min.js"
+            integrity="sha384-QCIdq2UMVEoSRhR3ZWZwdz2/pivLowr+eokFMdYyukq7qI26VYRxFa4Nl6FKetmL" crossorigin="anonymous"></script>
+
+    <script src="https://<ilc-cdn>/fb/v2026.07.31.7/fb.js"></script>
+    <script src="../../js/cloudpages.js"></script>
+</head>
+<body>
+<div class="container-fluid py-3">
+    <header class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">Totals and Links</h4>
+            <span class="text-muted small">Grand total and record links test page</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div id="cp-controls"></div>
+            <span id="env-badge" class="badge text-bg-secondary"></span>
+        </div>
+    </header>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div id="parametersContainer"></div>
+            <div class="d-flex gap-2 mt-2">
+                <button id="submitButton" class="btn btn-primary">Run</button>
+                <button id="exportBtn" class="btn btn-outline-secondary">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tableContainer"></div>
+</div>
+
+<script id="settings" type="application/json">
+{
+  "load_on_open": false,
+  "page_length": 50,
+  "column_toggles": true,
+  "theme": "auto",
+  "grand_totals": ["qty", "total_price"],
+  "custom_fields": {
+    "so": "SO",
+    "product": "Product"
+  }
+}
+</script>
+
+<script id="parameters" type="application/json">
+{
+  "date_range": {
+    "label": "Date issued",
+    "type": "date",
+    "mode": "range",
+    "demo_column": "order_date"
+  },
+  "status": {
+    "label": "Status",
+    "type": "dropdown",
+    "mode": "multi",
+    "options": [
+      {
+        "value": "20",
+        "label": "Issued"
+      },
+      {
+        "value": "25",
+        "label": "In Progress"
+      },
+      {
+        "value": "60",
+        "label": "Fulfilled"
+      }
+    ],
+    "demo_column": "status_id"
+  },
+  "product": {
+    "label": "Product contains",
+    "type": "string",
+    "demo_column": "product_num"
+  }
+}
+</script>
+
+<script id="query" type="text/plain">
+SELECT so.num                AS order_num,
+       soitem.soLineItem     AS line_num,
+       customer.name         AS customer_name,
+       DATE(so.dateIssued)   AS order_date,
+       so.statusId           AS status_id,
+       product.num           AS product_num,
+       product.description   AS description,
+       soitem.qtyOrdered     AS qty,
+       soitem.unitPrice      AS unit_price,
+       soitem.totalPrice     AS total_price
+       /*cf:select*/
+FROM soitem
+JOIN so ON so.id = soitem.soId
+JOIN customer ON customer.id = so.customerId
+JOIN product ON product.id = soitem.productId
+WHERE 1 = 1
+  AND so.statusId IN (:status)                         /*opt:status*/
+  AND DATE(so.dateIssued) >= :date_range_start         /*opt:date_range_start*/
+  AND DATE(so.dateIssued) <= :date_range_end           /*opt:date_range_end*/
+  AND product.num LIKE CONCAT('%', :product, '%')      /*opt:product*/
+  /*cf:where*/
+ORDER BY so.dateIssued DESC, so.num, soitem.soLineItem
+</script>
+
+<script id="columns" type="application/json">
+{
+  "order_num": {
+    "label": "Order #",
+    "link": { "module": "Sales Order" }
+  },
+  "line_num": {
+    "label": "Line"
+  },
+  "customer_name": {
+    "label": "Customer",
+    "link": { "module": "Customer" }
+  },
+  "order_date": {
+    "label": "Date issued",
+    "format": "date"
+  },
+  "status_id": {
+    "visible": false
+  },
+  "product_num": {
+    "label": "Product"
+  },
+  "description": {
+    "label": "Description",
+    "link": { "module": "Product", "key": "product_num" }
+  },
+  "qty": {
+    "label": "Qty",
+    "format": "number"
+  },
+  "unit_price": {
+    "label": "Unit price",
+    "format": "currency"
+  },
+  "total_price": {
+    "label": "Total",
+    "format": "currency"
+  }
+}
+</script>
+
+<script id="demo" type="application/json">
+{
+  "query": [
+    {
+      "order_num": "DEMO-1001",
+      "line_num": 1,
+      "customer_name": "Example Customer A",
+      "order_date": "2026-09-03",
+      "status_id": 20,
+      "product_num": "DEMO-WIDGET",
+      "description": "Example widget, blue",
+      "qty": 40,
+      "unit_price": 18.0,
+      "total_price": 720.0,
+      "cf_so_51": "West",
+      "cf_so_52": "W-14",
+      "cf_so_53": "2026-09-10",
+      "cf_product_61": 12,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "24.99",
+      "cf_so_54": "true"
+    },
+    {
+      "order_num": "DEMO-1001",
+      "line_num": 2,
+      "customer_name": "Example Customer A",
+      "order_date": "2026-09-03",
+      "status_id": 20,
+      "product_num": "DEMO-CABLE",
+      "description": "Example cable, 2 m",
+      "qty": 96,
+      "unit_price": 6.0,
+      "total_price": 576.0,
+      "cf_so_51": "West",
+      "cf_so_52": "W-14",
+      "cf_so_53": "2026-09-10",
+      "cf_product_61": 48,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "8.50",
+      "cf_so_54": "true"
+    },
+    {
+      "order_num": "DEMO-1002",
+      "line_num": 1,
+      "customer_name": "Example Customer B",
+      "order_date": "2026-09-08",
+      "status_id": 60,
+      "product_num": "DEMO-GADGET",
+      "description": "Example gadget, large",
+      "qty": 12,
+      "unit_price": 59.0,
+      "total_price": 708.0,
+      "cf_so_51": "East",
+      "cf_so_52": "E-02",
+      "cf_so_53": "2026-09-12",
+      "cf_product_61": 6,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "79.00",
+      "cf_so_54": "false"
+    },
+    {
+      "order_num": "DEMO-1002",
+      "line_num": 2,
+      "customer_name": "Example Customer B",
+      "order_date": "2026-09-08",
+      "status_id": 60,
+      "product_num": "DEMO-BRACKET",
+      "description": "Example bracket, steel",
+      "qty": 48,
+      "unit_price": 3.9,
+      "total_price": 187.2,
+      "cf_so_51": "East",
+      "cf_so_52": "E-02",
+      "cf_so_53": "2026-09-12",
+      "cf_product_61": 24,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "5.25",
+      "cf_so_54": "false"
+    },
+    {
+      "order_num": "DEMO-1003",
+      "line_num": 1,
+      "customer_name": "Example Customer A",
+      "order_date": "2026-09-15",
+      "status_id": 25,
+      "product_num": "DEMO-GADGET",
+      "description": "Example gadget, large",
+      "qty": 6,
+      "unit_price": 59.0,
+      "total_price": 354.0,
+      "cf_so_51": "West",
+      "cf_so_52": "W-14",
+      "cf_so_53": "2026-09-22",
+      "cf_product_61": 6,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "79.00",
+      "cf_so_54": "false"
+    },
+    {
+      "order_num": "DEMO-1003",
+      "line_num": 2,
+      "customer_name": "Example Customer A",
+      "order_date": "2026-09-15",
+      "status_id": 25,
+      "product_num": "DEMO-WIDGET",
+      "description": "Example widget, blue",
+      "qty": 24,
+      "unit_price": 18.0,
+      "total_price": 432.0,
+      "cf_so_51": "West",
+      "cf_so_52": "W-14",
+      "cf_so_53": "2026-09-22",
+      "cf_product_61": 12,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "24.99",
+      "cf_so_54": "false"
+    },
+    {
+      "order_num": "DEMO-1004",
+      "line_num": 1,
+      "customer_name": "Example Customer C",
+      "order_date": "2026-09-21",
+      "status_id": 60,
+      "product_num": "DEMO-CABLE",
+      "description": "Example cable, 2 m",
+      "qty": 144,
+      "unit_price": 6.0,
+      "total_price": 864.0,
+      "cf_so_51": "Central",
+      "cf_so_52": "C-07",
+      "cf_so_53": "2026-09-25",
+      "cf_product_61": 48,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "8.50",
+      "cf_so_54": "true"
+    },
+    {
+      "order_num": "DEMO-1004",
+      "line_num": 2,
+      "customer_name": "Example Customer C",
+      "order_date": "2026-09-21",
+      "status_id": 60,
+      "product_num": "DEMO-BRACKET",
+      "description": "Example bracket, steel",
+      "qty": 72,
+      "unit_price": 3.9,
+      "total_price": 280.8,
+      "cf_so_51": "Central",
+      "cf_so_52": "C-07",
+      "cf_so_53": "2026-09-25",
+      "cf_product_61": 24,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "5.25",
+      "cf_so_54": "true"
+    },
+    {
+      "order_num": "DEMO-1005",
+      "line_num": 1,
+      "customer_name": "Example Customer B",
+      "order_date": "2026-10-02",
+      "status_id": 20,
+      "product_num": "DEMO-WIDGET",
+      "description": "Example widget, blue",
+      "qty": 60,
+      "unit_price": 18.0,
+      "total_price": 1080.0,
+      "cf_so_51": "East",
+      "cf_so_52": "E-02",
+      "cf_so_53": "2026-10-09",
+      "cf_product_61": 12,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "24.99",
+      "cf_so_54": "false"
+    },
+    {
+      "order_num": "DEMO-1006",
+      "line_num": 1,
+      "customer_name": "Example Customer D",
+      "order_date": "2026-10-06",
+      "status_id": 20,
+      "product_num": "DEMO-GADGET",
+      "description": "Example gadget, large",
+      "qty": 3,
+      "unit_price": 59.0,
+      "total_price": 177.0,
+      "cf_so_51": null,
+      "cf_so_52": null,
+      "cf_so_53": null,
+      "cf_product_61": 6,
+      "cf_product_62": "Northwind",
+      "cf_product_63": "79.00",
+      "cf_so_54": null
+    },
+    {
+      "order_num": "DEMO-1006",
+      "line_num": 2,
+      "customer_name": "Example Customer D",
+      "order_date": "2026-10-06",
+      "status_id": 20,
+      "product_num": "DEMO-CABLE",
+      "description": "Example cable, 2 m",
+      "qty": 48,
+      "unit_price": 6.0,
+      "total_price": 288.0,
+      "cf_so_51": null,
+      "cf_so_52": null,
+      "cf_so_53": null,
+      "cf_product_61": 48,
+      "cf_product_62": "Coastline",
+      "cf_product_63": "8.50",
+      "cf_so_54": null
+    }
+  ],
+  "custom_fields": [
+    {
+      "id": 51,
+      "name": "Region",
+      "type_id": 7,
+      "table_ref": "SO",
+      "table_name": "Sales Order",
+      "list_id": 9
+    },
+    {
+      "id": 52,
+      "name": "Rep Code",
+      "type_id": 1,
+      "table_ref": "SO",
+      "table_name": "Sales Order",
+      "list_id": null
+    },
+    {
+      "id": 53,
+      "name": "Ship By",
+      "type_id": 2,
+      "table_ref": "SO",
+      "table_name": "Sales Order",
+      "list_id": null
+    },
+    {
+      "id": 54,
+      "name": "Rush",
+      "type_id": 6,
+      "list_id": null,
+      "table_ref": "SO",
+      "table_name": "Sales Order"
+    },
+    {
+      "id": 61,
+      "name": "Case Pack",
+      "type_id": 5,
+      "table_ref": "Product",
+      "table_name": "Product",
+      "list_id": null
+    },
+    {
+      "id": 62,
+      "name": "Brand",
+      "type_id": 1,
+      "table_ref": "Product",
+      "table_name": "Product",
+      "list_id": null
+    },
+    {
+      "id": 63,
+      "name": "MSRP",
+      "type_id": 3,
+      "table_ref": "Product",
+      "table_name": "Product",
+      "list_id": null
+    }
+  ],
+  "user": {
+    "companyName": "Demo Co",
+    "username": "demo"
+  },
+  "custom_lists": [
+    {
+      "list_id": 9,
+      "name": "Central"
+    },
+    {
+      "list_id": 9,
+      "name": "East"
+    },
+    {
+      "list_id": 9,
+      "name": "West"
+    }
+  ]
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var badge = document.getElementById('env-badge');
+    setTimeout(function () { if (FB.isDemo) { badge.textContent = 'demo'; badge.className = 'badge text-bg-warning'; } else { badge.remove(); } }, 300);
+});
+</script>
+</body>
+</html>

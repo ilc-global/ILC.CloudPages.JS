@@ -141,6 +141,41 @@ Set explicit widths to prevent columns from auto-sizing:
 }
 ```
 
+## Record Links
+
+`link` makes a cell open a record in Fishbowl when the user clicks it.
+
+```json
+"order_num": { "label": "Order #", "link": { "module": "Sales Order" } },
+"description": { "label": "Description", "link": { "module": "Product", "key": "product_num" } }
+```
+
+- `module` is the module name as Fishbowl spells it: "Sales Order", not
+  "SalesOrder".
+- Fishbowl opens a record by its **number or name, never its id**. By default
+  the cell's own value is used, so put `link` on the number column. `key`
+  names another column in the row that holds the number.
+- A row whose number is blank gets plain text.
+- Links exist only inside the Fishbowl client. In demo mode and on the web the
+  cell is plain text.
+- Sorting, search and exports use the cell's value, as before.
+
+## Grand Total Row
+
+`grand_totals` in `#settings` adds one total row under the table.
+
+```json
+{ "grand_totals": ["qty", "total_price"] }
+```
+
+- Each listed column is summed and shown in that column's own format. The
+  first visible column that is not a total reads "Total".
+- The row sums the rows that match the current search, across all pages.
+- It works together with `group_by` and `group_totals`.
+- XLSX and Markdown exports end with a total row. It sums every exported row,
+  because an export holds all the rows and not the searched ones. CSV stays
+  flat data and gets no total row.
+
 ## Auto-Detected Columns
 
 Columns returned by your SQL query that are **not** listed in the columns config still appear in the table. They use:

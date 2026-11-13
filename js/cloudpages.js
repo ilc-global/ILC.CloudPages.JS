@@ -1026,6 +1026,75 @@
         };
     }
 
+    function escHtml(val) {
+        return String(val === null || val === undefined ? '' : val)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Column "link": { "module": "Sales Order", "key": "order_num" } makes the
+    // cell open that record in Fishbowl. hyperLink takes the module name as
+    // Fishbowl spells it and the record's NUMBER or NAME, never its id. "key"
+    // names the row column that holds it and defaults to the cell's own
+    // column. Only the Fishbowl client can open a record, so everywhere else
+    // (demo, web) the cell stays plain text.
+    // Exposed so a test can stand in for the client.
+    CloudPages.linksEnabled = function () { return !!FB.isJXBrowser; };
+
+    function linkCellHtml(colCfg, key, row, text) {
+        var link = colCfg.link;
+        var param = row[link.key || key];
+        if (!link.module || param === null || param === undefined || param === '') return escHtml(text);
+        return '<a href="#" class="cp-link" data-cp-module="' + escHtml(link.module) +
+            '" data-cp-param="' + escHtml(param) + '">' + escHtml(text) + '</a>';
+    }
+
+    function onLinkClick(e) {
+        var a = e.target && e.target.closest ? e.target.closest('a.cp-link') : null;
+        if (!a) return;
+        e.preventDefault();
+        var module = a.getAttribute('data-cp-module');
+        var param = a.getAttribute('data-cp-param');
+        try {
+            FB.hyperLink(module, param);
+        } catch (err) {
+            console.error('CloudPages: could not open ' + module + ' ' + param + ':', err);
+            FB.setStatus('Could not open ' + module + ' ' + param + '.');
+        }
+    }
+
+    // settings.grand_totals: the sum of each listed column over the given
+    // rows. A value that is not a number adds nothing.
+    function sumColumns(rows, keys) {
+        var totals = {};
+        keys.forEach(function (k) { totals[k] = 0; });
+        rows.forEach(function (row) {
+            keys.forEach(function (k) {
+                var n = parseFloat(row[k]);
+                if (!isNaN(n)) totals[k] += n;
+            });
+        });
+        return totals;
+    }
+
+    // The total row an export appends: sums in the total columns, the word
+    // "Total" in the first column that is not one of them.
+    function grandTotalExportRow(data) {
+        var totalKeys = ((_config && _config.settings) || {}).grand_totals || [];
+        if (!totalKeys.length || !data || !data.length) return null;
+        var keys = Object.keys(data[0]);
+        var present = totalKeys.filter(function (k) { return keys.indexOf(k) >= 0; });
+        if (!present.length) return null;
+        var totals = sumColumns(data, present);
+        var row = {}, labelled = false;
+        keys.forEach(function (k) {
+            if (totals[k] !== undefined) { row[k] = totals[k]; return; }
+            row[k] = labelled ? '' : 'Total';
+            labelled = true;
+        });
+        return row;
+    }
+
     function renderTable(rows, columns, settings) {
         var container = document.getElementById('tableContainer');
         if (!container) return;
@@ -1068,7 +1137,14 @@
             };
             if (colCfg.width) def.width = colCfg.width;
             var renderFn = columnRenderFn(colCfg, settings);
-            if (renderFn) def.render = function (data) { return renderFn(data); };
+            if (colCfg.link && CloudPages.linksEnabled()) {
+                def.render = function (data, type, row) {
+                    var text = renderFn ? renderFn(data) : data;
+                    return type === 'display' ? linkCellHtml(colCfg, key, row, text) : text;
+                };
+            } else if (renderFn) {
+                def.render = function (data) { return renderFn(data); };
+            }
             return def;
         });
 
@@ -1077,6 +1153,19 @@
         table.id = 'cp-data-table';
         table.className = 'table table-striped table-hover';
         container.appendChild(table);
+        table.addEventListener('click', onLinkClick);
+
+        // Grand total row (settings.grand_totals): one footer row that sums
+        // the listed columns over the rows matching the current search.
+        var grandKeys = (settings.grand_totals || []).filter(function (k) { return keySet[k]; });
+        if (grandKeys.length) {
+            var tfoot = document.createElement('tfoot');
+            var footRow = document.createElement('tr');
+            footRow.className = 'cp-grand-total';
+            allKeys.forEach(function () { footRow.appendChild(document.createElement('th')); });
+            tfoot.appendChild(footRow);
+            table.appendChild(tfoot);
+        }
 
         // Pagination: small result sets render whole (computers are fast);
         // beyond settings.paginate_over (default 100) paginate at
@@ -1156,9 +1245,39 @@
             };
         }
 
+        if (grandKeys.length) {
+            dtConfig.footerCallback = function () {
+                var api = this.api();
+                var totals = sumColumns(api.rows({ search: 'applied' }).data().toArray(), grandKeys);
+                var visible = api.columns().visible().toArray();
+                var labelled = false;
+                allKeys.forEach(function (k, i) {
+                    var cell = api.column(i).footer();
+                    if (!cell) return;
+                    if (totals[k] !== undefined) {
+                        var fn = columnRenderFn(columns[k], settings);
+                        cell.textContent = fn ? fn(totals[k]) : formatNumber(totals[k], settings.qty_unit_format);
+                    } else if (visible[i] && !labelled) {
+                        cell.textContent = 'Total';
+                        labelled = true;
+                    } else {
+                        cell.textContent = '';
+                    }
+                });
+            };
+        }
+
         _dataTableInstance = $(table).DataTable(dtConfig);
 
         applySize(currentSize(settings));
+
+        // The "Total" label sits in the first visible column, so a column
+        // toggle has to redraw the footer.
+        if (grandKeys.length) {
+            _dataTableInstance.on('column-visibility.dt', function () {
+                _dataTableInstance.draw(false);
+            });
+        }
 
         // Toggling a column adjusts data-row cells in place without a draw,
         // so RowGroup's header/totals rows keep their old cell layout. Force
@@ -1299,6 +1418,8 @@
             });
             return out;
         });
+        var totalRow = grandTotalExportRow(rows);
+        if (totalRow) data.push(totalRow);
         var ws = XLSX.utils.json_to_sheet(data, { cellDates: true });
         // Number formats per column
         if (data.length) {
@@ -1439,6 +1560,8 @@
         data.forEach(function (row) {
             out.push('| ' + keys.map(function (k) { return mdEscape(row[k]); }).join(' | ') + ' |');
         });
+        var totalRow = grandTotalExportRow(data);
+        if (totalRow) out.push('| ' + keys.map(function (k) { return mdEscape(totalRow[k]); }).join(' | ') + ' |');
         var md = out.join('\n');
 
         if (FB.isJXBrowser) {

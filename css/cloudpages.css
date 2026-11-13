@@ -242,3 +242,8 @@ dialog.cp-cf-dialog::backdrop { background: rgba(0, 0, 0, .5); }
 .cp-cf-values { display: flex; align-items: center; gap: .5rem; }
 .cp-cf-values > .form-control, .cp-cf-values > .form-select { min-width: 0; }
 @media (max-width: 640px) { .cp-cf-row { grid-template-columns: 1fr; } }
+
+/* Grand total row and record links */
+tr.cp-grand-total th { font-weight: 600; border-top: 2px solid var(--bs-border-color, #dee2e6); white-space: nowrap; }
+a.cp-link { text-decoration: none; }
+a.cp-link:hover { text-decoration: underline; }

@@ -78,6 +78,7 @@ That's it. No JavaScript to write — cloudpages.js reads the config and wires e
 | `column_toggles` | boolean | `false` | Runtime show/hide-columns button (requires the DataTables Buttons+ColVis extension vendored) |
 | `group_by` | string | — | Group rows by this column key (requires the DataTables RowGroup extension vendored) |
 | `group_totals` | string[] | — | Column keys subtotaled per group; the totals row tracks runtime column visibility |
+| `grand_totals` | string[] | — | Column keys summed in one total row under the table (see [Column Formatting](docs/column-formatting.md#grand-total-row)) |
 | `custom_fields` | object | — | Maps a SQL alias to a Fishbowl record, e.g. `{ "so": "SO" }`. Lets the user add custom fields as columns and filters at the `/*cf:...*/` markers (see [Custom Fields](docs/custom-fields.md)) |
 
 Dropdown parameters accept a static `options` array (`[{ "value": "10", "label": "Entered" }, …]`) as an alternative to `sql`-loaded options; `default` pre-selects by value.
@@ -117,6 +118,7 @@ Object keyed by column alias from SQL. Each column can have:
 | `format` | `currency`, `date`, `number`, `percent` |
 | `visible` | `false` to hide column |
 | `width` | CSS width value |
+| `link` | `{ "module": "Sales Order" }` makes the cell open that record in Fishbowl (see [Column Formatting](docs/column-formatting.md#record-links)) |
 
 Columns not listed here still render — they just use defaults.
 
