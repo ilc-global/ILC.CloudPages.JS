@@ -995,6 +995,19 @@
         return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     }
 
+    // A total for a column with no format: a column that holds only whole
+    // numbers (counts) gets a whole-number total, anything else the quantity
+    // format.
+    function totalText(rows, key, value, settings) {
+        var whole = rows.every(function (r) {
+            var v = r[key];
+            if (v === null || v === undefined || v === '') return true;
+            var n = parseFloat(v);
+            return isNaN(n) || Math.floor(n) === n;
+        });
+        return whole ? Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 }) : formatNumber(value, settings.qty_unit_format);
+    }
+
     function formatPercent(val) {
         var num = parseFloat(val);
         if (isNaN(num)) return val;
@@ -1232,7 +1245,7 @@
                         var td = document.createElement('td');
                         if (totals[k] !== undefined) {
                             var renderFn = columnRenderFn(columns[k], settings);
-                            td.textContent = renderFn ? renderFn(totals[k]) : formatNumber(totals[k], settings.qty_unit_format);
+                            td.textContent = renderFn ? renderFn(totals[k]) : totalText(groupRows.data().toArray(), k, totals[k], settings);
                             td.style.fontWeight = '600';
                         } else if (i === firstVisible) {
                             td.textContent = 'Total';
@@ -1248,7 +1261,8 @@
         if (grandKeys.length) {
             dtConfig.footerCallback = function () {
                 var api = this.api();
-                var totals = sumColumns(api.rows({ search: 'applied' }).data().toArray(), grandKeys);
+                var shown = api.rows({ search: 'applied' }).data().toArray();
+                var totals = sumColumns(shown, grandKeys);
                 var visible = api.columns().visible().toArray();
                 var labelled = false;
                 allKeys.forEach(function (k, i) {
@@ -1256,7 +1270,7 @@
                     if (!cell) return;
                     if (totals[k] !== undefined) {
                         var fn = columnRenderFn(columns[k], settings);
-                        cell.textContent = fn ? fn(totals[k]) : formatNumber(totals[k], settings.qty_unit_format);
+                        cell.textContent = fn ? fn(totals[k]) : totalText(shown, k, totals[k], settings);
                     } else if (visible[i] && !labelled) {
                         cell.textContent = 'Total';
                         labelled = true;
@@ -1654,6 +1668,11 @@
 
     function cfKey(alias, id) { return 'cf_' + alias + '_' + id; }
     function cfFieldKey(f) { return cfKey(f.alias, f.id); }
+    // A record with no display name in Fishbowl (BOMItem) is named from its
+    // table name, with spaces: "BOM Item".
+    function cfSpaceName(name) {
+        return String(name || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+    }
     function cfFieldLabel(f) { return f.tableName + ': ' + f.name; }
     function cfState() { return { columns: _cf.columns.slice(), filters: _cf.filters.filter(cfFilterComplete) }; }
     function cfFieldOk(f) { return f && CF_ALIAS_RE.test(f.alias) && !isNaN(parseInt(f.id, 10)); }
@@ -1677,7 +1696,7 @@
                     defs.push({
                         alias: alias, id: parseInt(r.id, 10), name: String(r.name),
                         typeId: parseInt(r.type_id, 10), listId: isNaN(listId) ? null : listId,
-                        tableName: r.table_name || r.table_ref
+                        tableName: r.table_name || cfSpaceName(r.table_ref)
                     });
                 });
             });
